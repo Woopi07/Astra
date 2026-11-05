@@ -31,20 +31,45 @@ const BALANCE_ROUNDS = [
   }
 ];
 
-/* ---------- Home: Think critically ---------- */
-const THINK_QUESTION = {
-  tag: "Intellectual skills",
-  title: "A company reports a sudden increase in expenses. What should you do first?",
-  scenario: "You notice that recorded expenses are significantly higher than those of the previous month. Your supervisor asks you to investigate.",
-  choices: [
-    "Accept the figures as correct",
-    "Review supporting documents and compare records",
-    "Immediately reduce the expenses",
-    "Ignore the difference"
-  ],
-  answer: 1,
-  explain: "Critical thinking means examining evidence, comparing information, and identifying possible reasons before drawing conclusions."
-};
+/* ---------- Home: Skill check (from the study's sample activities) ---------- */
+const SKILL_CHECKS = [
+  {
+    tag: "Intellectual skills",
+    skill: "Think critically",
+    title: "A company reports a sudden increase in expenses. What should you do first?",
+    scenario: "You notice that recorded expenses are significantly higher than those of the previous month. Your supervisor asks you to investigate.",
+    choices: ["Accept the figures as correct", "Review supporting documents and compare records", "Immediately reduce the expenses", "Ignore the difference"],
+    answer: 1,
+    explain: "Critical thinking means examining evidence, comparing information, and identifying possible reasons before drawing conclusions."
+  },
+  {
+    tag: "Personal skills",
+    skill: "Adapt and learn",
+    title: "Your organization introduces a new accounting system. How should you respond?",
+    scenario: "You are familiar with the old system, but your workplace is transitioning to a new digital platform.",
+    choices: ["Refuse to use the new system", "Wait for someone else to do everything", "Explore the system and seek training", "Continue using the old process without approval"],
+    answer: 2,
+    explain: "Adaptability and continuous learning help professionals adjust to new technologies and changing workplace demands."
+  },
+  {
+    tag: "Technical skills",
+    skill: "The spreadsheet race",
+    title: "500 transactions need to be analyzed. What is your best move?",
+    scenario: "Your team has a reporting deadline. You need to identify unusual transactions and summarize expenses. Which approach would help most?",
+    choices: ["Calculate everything manually", "Use spreadsheet filters and formulas", "Rewrite all the transactions", "Skip the detailed review"],
+    answer: 1,
+    explain: "Spreadsheet formulas and filters help process large amounts of data efficiently. Digital tools are valuable in modern accounting. Work smarter, not harder!"
+  },
+  {
+    tag: "Interpersonal skills",
+    skill: "Team up",
+    title: "Your group has a deadline, but everyone is confused. What now?",
+    scenario: "You and your classmates are working on a financial analysis project. Some tasks overlap, and nobody is sure who should do what. What is the best solution?",
+    choices: ["Work alone without communicating", "Divide tasks based on strengths and set clear deadlines", "Let one person do everything", "Wait until someone takes the lead"],
+    answer: 1,
+    explain: "Successful teamwork needs communication, coordination, and shared responsibility. Clear assignments and deadlines help everyone stay organized. A good team grows together!"
+  }
+];
 
 /* ---------- Students: Five habits ---------- */
 const HABITS = [

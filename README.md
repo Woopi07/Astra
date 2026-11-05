@@ -9,6 +9,8 @@ A gamified, static website (HTML + CSS + vanilla JS, no build step) with supplem
 - **Educators**: seven suggested teaching approaches, each with "How to apply?" steps.
 - **PLV Admins**: five suggested university policies.
 
+Home highlights: overview cards that flip in 3D and show the visitor's progress, a hanging balance scale where you drag amounts onto the pans, a 4-question Skill Check (intellectual, personal, technical, interpersonal) with an achievement summary, and an interactive background (cells light up around the cursor, floating + − × ÷ ₱ symbols react to it, and clicking empty space sends out a ripple). On phones the navigation becomes a burger menu.
+
 Extras: a 3D loading screen (spinning calculator-key cube), 3D tilt cards, the timed **Debit or Credit Rush** game on Home, 10 collectible **badges** (click the XP screen in the header), confetti, an optional sound toggle, and keyboard shortcuts (1–4 / A–D to answer, Enter for next, ←/→ in Rush).
 
 XP, rank, unlocked habits, and best scores are saved in the visitor's browser (`localStorage`). "Reset my progress" in the footer clears them.

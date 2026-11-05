@@ -13,7 +13,7 @@
 
   /* ---------------- Progress (saved per browser) ---------------- */
   const KEY = "astra-progress-v1";
-  const fresh = () => ({ xp: 0, awarded: {}, habits: [], questStep: 0, questStarted: false, best: {}, seenEdu: [], seenAdm: [], badges: [], rushBest: 0, sound: false });
+  const fresh = () => ({ xp: 0, awarded: {}, habits: [], questStep: 0, questStarted: false, best: {}, seenEdu: [], seenAdm: [], badges: [], rushBest: 0, sound: false, hubSeen: [] });
   let state = fresh();
   try {
     const raw = localStorage.getItem(KEY);
@@ -144,6 +144,8 @@
     const hash = (location.hash || "#home").slice(1);
     const target = hash === "sidequests" ? "students" : (VIEWS.includes(hash) ? hash : "home");
     $$(".view").forEach((v) => { v.hidden = v.dataset.view !== target; });
+    if (target === "home" && $("#overview")) renderOverview();
+    if (target === "hub" && $("#hubTabs").children.length) renderHub();
     $$(".pill").forEach((p) => {
       const on = p.dataset.tab === target;
       p.classList.toggle("active", on);
@@ -168,61 +170,224 @@
   };
 
   /* ==========================================================
-     HOME — Balance the Entry
+     HOME — Overview flip cards (with live progress)
      ========================================================== */
-  const bal = { round: 0, pick: null, tries: 0 };
+  const OVERVIEW = [
+    { id: "students", color: "yellow", k: "For accounting students", title: "Five habits that pay off", desc: "Habits for building skills that carry across systems, plus a case-study quest and side quests.", count: "05", cta: "Start the quest", href: "#students",
+      list: () => HABITS.map((h) => ({ t: h.title, done: state.habits.includes(h.id) })) },
+    { id: "hub", color: "blue", k: "Resource hub", title: "Tutorials to templates", desc: "Software guides, exercises, videos, case studies and templates.", count: "05", cta: "Open the hub", href: "#hub",
+      list: () => HUB_TABS.map((t) => ({ t: t.title, done: state.hubSeen.includes(t.id) })) },
+    { id: "educators", color: "coral", k: "For educators", title: "Seven approaches", desc: "Ways to teach with software, simulations and rubrics.", count: "07", cta: "See approaches", href: "#educators",
+      list: () => APPROACHES.map((x, i) => ({ t: x.title, done: state.seenEdu.includes(i) })) },
+    { id: "admins", color: "mint", k: "For PLV admins", title: "Five policies", desc: "Suggested university policies for technology-integrated instruction.", count: "05", cta: "Read policies", href: "#admins",
+      list: () => POLICIES.map((x, i) => ({ t: x.title, done: state.seenAdm.includes(i) })) }
+  ];
+
+  function ring(pct) {
+    const r = 17, c = 2 * Math.PI * r;
+    return `<svg class="ring" viewBox="0 0 44 44" aria-hidden="true"><circle cx="22" cy="22" r="${r}" class="ring-bg"/><circle cx="22" cy="22" r="${r}" class="ring-fg" stroke-dasharray="${c.toFixed(1)}" stroke-dashoffset="${(c * (1 - pct)).toFixed(1)}"/></svg>`;
+  }
+
+  function renderOverview() {
+    const el = $("#overview");
+    if (!el) return;
+    el.innerHTML = OVERVIEW.map((o) => {
+      const items = o.list();
+      const done = items.filter((x) => x.done).length;
+      const pct = items.length ? done / items.length : 0;
+      return `<div class="flip" data-tilt>
+        <div class="flip-inner ov-${o.color}" role="button" tabindex="0" aria-pressed="false" aria-label="${esc(o.title)}: flip card for details">
+          <div class="flip-face flip-front">
+            <span class="ov-k">${esc(o.k)}</span>
+            <span class="ov-count" aria-hidden="true">${o.count}</span>
+            <strong>${esc(o.title)}</strong>
+            <span class="ov-desc">${esc(o.desc)}</span>
+            <span class="ov-foot">
+              <span class="ov-prog">${ring(pct)}<span><b>${done}/${items.length}</b> ${o.id === "students" ? "collected" : "explored"}</span></span>
+              <span class="ov-flip-hint">Flip ↻</span>
+            </span>
+          </div>
+          <div class="flip-face flip-back">
+            <span class="ov-k">${esc(o.k)} · ${done}/${items.length}</span>
+            <ul class="ov-list">${items.map((x) => `<li class="${x.done ? "done" : ""}">${esc(x.t)}</li>`).join("")}</ul>
+            <a class="ov-go" href="${o.href}">${esc(o.cta)} →</a>
+          </div>
+        </div>
+      </div>`;
+    }).join("");
+    $$(".flip-inner", el).forEach((card) => {
+      const toggle = () => {
+        const on = !card.classList.contains("flipped");
+        card.classList.toggle("flipped", on);
+        card.setAttribute("aria-pressed", String(on));
+        fx.sound("click");
+      };
+      card.addEventListener("click", (e) => { if (!e.target.closest("a")) toggle(); });
+      card.addEventListener("keydown", (e) => { if ((e.key === "Enter" || e.key === " ") && e.target === card) { e.preventDefault(); toggle(); } });
+    });
+  }
+
+  /* ==========================================================
+     HOME — Balance the Entry (hanging scale + drag weights)
+     ========================================================== */
+  const bal = { round: 0, pick: null, tries: 0, angle: 0, anim: null };
+  const SCALE = { W: 400, H: 230, cx: 200, cy: 56, L: 128, drop: 34 };
+
+  function balTotals(pickOverride) {
+    const r = BALANCE_ROUNDS[bal.round];
+    const v = pickOverride === undefined ? bal.pick : pickOverride;
+    const sum = (ls) => ls.reduce((t, l) => t + (l.amt === null ? (v || 0) : l.amt), 0);
+    return { d: sum(r.debit), c: sum(r.credit) };
+  }
+  const targetAngle = (t) => {
+    const max = Math.max(t.d, t.c, 1);
+    return Math.max(-0.24, Math.min(0.24, ((t.c - t.d) / max) * 0.3));
+  };
+
+  function placeScale(angle) {
+    const st = $("#bscale");
+    if (!st) return;
+    const { cx, cy, L, drop, W, H } = SCALE;
+    const lx = cx - L * Math.cos(angle), ly = cy - L * Math.sin(angle);
+    const rx = cx + L * Math.cos(angle), ry = cy + L * Math.sin(angle);
+    const beam = $("#bBeam", st);
+    beam.setAttribute("x1", lx); beam.setAttribute("y1", ly); beam.setAttribute("x2", rx); beam.setAttribute("y2", ry);
+    [["#bStrL1", lx - 22, ly], ["#bStrL2", lx + 22, ly], ["#bStrR1", rx - 22, ry], ["#bStrR2", rx + 22, ry]].forEach(([id, x, y]) => {
+      const ln = $(id, st);
+      ln.setAttribute("x1", id.includes("L") ? lx : rx); ln.setAttribute("y1", y);
+      ln.setAttribute("x2", x); ln.setAttribute("y2", y + drop);
+    });
+    $("#bKnobL", st).setAttribute("cx", lx); $("#bKnobL", st).setAttribute("cy", ly);
+    $("#bKnobR", st).setAttribute("cx", rx); $("#bKnobR", st).setAttribute("cy", ry);
+    const pd = $(".bpan-d", st), pc = $(".bpan-c", st);
+    pd.style.left = (lx / W) * 100 + "%"; pd.style.top = ((ly + drop) / H) * 100 + "%";
+    pc.style.left = (rx / W) * 100 + "%"; pc.style.top = ((ry + drop) / H) * 100 + "%";
+    const level = Math.abs(angle) < 0.004;
+    st.classList.toggle("level", level && bal.pick !== null);
+  }
+
+  function swingTo(target) {
+    cancelAnimationFrame(bal.anim);
+    if (reduceMotion) { bal.angle = target; placeScale(target); return; }
+    let a = bal.angle, v = 0;
+    const step = () => {
+      v = (v + (target - a) * 0.09) * 0.82; // damped spring
+      a += v;
+      bal.angle = a;
+      placeScale(a);
+      if (Math.abs(target - a) > 0.0005 || Math.abs(v) > 0.0005) bal.anim = requestAnimationFrame(step);
+      else { bal.angle = target; placeScale(target); }
+    };
+    bal.anim = requestAnimationFrame(step);
+  }
 
   function renderBalance() {
     const el = $("#balanceGame");
     const r = BALANCE_ROUNDS[bal.round];
-    const fill = (lines) => lines.map((l) => ({ acct: l.acct, amt: l.amt === null ? bal.pick : l.amt, unknown: l.amt === null }));
-    const debit = fill(r.debit), credit = fill(r.credit);
-    const sum = (ls) => ls.reduce((s, l) => s + (l.amt || 0), 0);
-    const dT = sum(debit), cT = sum(credit);
-    const max = Math.max(dT, cT, 1);
-    const angle = Math.max(-10, Math.min(10, ((cT - dT) / max) * 14));
-    const balanced = bal.pick !== null && dT === cT;
-
-    const rows = (ls) => ls.map((l) => `<div class="row"><span>${esc(l.acct)}</span><span class="${l.unknown && bal.pick === null ? "q" : ""}">${l.amt === null ? "?" : l.amt.toLocaleString("en-PH")}</span></div>`).join("");
+    const t = balTotals();
+    const balanced = bal.pick !== null && t.d === t.c;
+    const unknownSide = r.debit.some((l) => l.amt === null) ? "d" : "c";
+    const rows = (ls) => ls.map((l) => {
+      if (l.amt !== null) return `<div class="brow"><span>${esc(l.acct)}</span><span>${l.amt.toLocaleString("en-PH")}</span></div>`;
+      const filled = bal.pick !== null;
+      return `<div class="brow"><span>${esc(l.acct)}</span><span class="slot ${filled ? (balanced ? "ok" : "bad") : ""}">${filled ? bal.pick.toLocaleString("en-PH") : "drop ?"}</span></div>`;
+    }).join("");
     const dots = BALANCE_ROUNDS.map((_, i) => `<i class="${i < bal.round ? "done" : i === bal.round ? "on" : ""}"></i>`).join("");
+    const diff = Math.abs(t.d - t.c);
+    const last = bal.round === BALANCE_ROUNDS.length - 1;
 
     let fb = "";
     if (bal.pick !== null) {
-      if (balanced) fb = `<div class="feedback ok"><b>Balanced! Debits = Credits = ${peso(dT)}</b>${esc(r.note)}</div>`;
-      else {
-        const diff = Math.abs(dT - cT);
-        const side = cT < dT ? "Credits are short" : "Debits are short";
-        fb = `<div class="feedback bad"><b>Off by ${peso(diff)}.</b>${side}. Try another amount.</div>`;
-      }
+      fb = balanced
+        ? `<div class="feedback ok"><b>Balanced! Debits = Credits = ${peso(t.d)}</b>${esc(r.note)}</div>`
+        : `<div class="feedback bad"><b>Off by ${peso(diff)}.</b>${t.c < t.d ? "Credits are short" : "Debits are short"}. Drag another amount onto the pan.</div>`;
     }
-    const last = bal.round === BALANCE_ROUNDS.length - 1;
 
     el.innerHTML = `
       <div class="panel-top"><span class="mono-k">Try it: balance the entry</span><div class="dots" aria-label="Round ${bal.round + 1} of ${BALANCE_ROUNDS.length}">${dots}</div></div>
       <h3>${esc(r.prompt)}</h3>
-      <div class="scale" aria-hidden="true">
-        <div class="fulcrum"></div>
-        <div class="beam" style="transform: rotate(${angle}deg)">
-          <div class="pan pan-debit" style="transform: rotate(${-angle}deg)"><b>Debit</b>${rows(debit)}</div>
-          <div class="pan pan-credit" style="transform: rotate(${-angle}deg)"><b>Credit</b>${rows(credit)}</div>
-        </div>
+      <div class="bscale" id="bscale">
+        <svg viewBox="0 0 ${SCALE.W} ${SCALE.H}" aria-hidden="true">
+          <path d="M200 60 L188 200 H212 Z" class="b-post"/>
+          <rect x="140" y="198" width="120" height="14" rx="7" class="b-base"/>
+          <g class="b-strings"><line id="bStrL1"/><line id="bStrL2"/><line id="bStrR1"/><line id="bStrR2"/></g>
+          <line id="bBeam" class="b-beam"/>
+          <circle id="bKnobL" r="6" class="b-knob"/><circle id="bKnobR" r="6" class="b-knob"/>
+          <circle cx="200" cy="56" r="10" class="b-pivot"/>
+        </svg>
+        <div class="bpan bpan-d ${unknownSide === "d" && !balanced ? "target" : ""}"><b>Debit</b>${rows(r.debit)}</div>
+        <div class="bpan bpan-c ${unknownSide === "c" && !balanced ? "target" : ""}"><b>Credit</b>${rows(r.credit)}</div>
       </div>
-      <div class="scale-totals"><span>Dr ${dT.toLocaleString("en-PH")}</span><span>Cr ${cT.toLocaleString("en-PH")}</span></div>
-      <div class="amounts" role="group" aria-label="Choose the missing amount">
-        ${r.options.map((o) => `<button type="button" class="choice amount ${bal.pick === o ? (balanced ? "correct" : "wrong") : ""}" data-amt="${o}" ${balanced ? "disabled" : ""}>${o.toLocaleString("en-PH")}</button>`).join("")}
+      <div class="btotals">
+        <span>Dr <b>${t.d.toLocaleString("en-PH")}</b></span>
+        <span class="bdiff ${balanced ? "zero" : ""}">${balanced ? "Δ 0 ✓" : "Δ " + diff.toLocaleString("en-PH")}</span>
+        <span>Cr <b>${t.c.toLocaleString("en-PH")}</b></span>
+      </div>
+      ${balanced ? "" : `<p class="bhelp">Drag a weight onto the <b>${unknownSide === "d" ? "debit" : "credit"}</b> pan, or tap one.</p>`}
+      <div class="weights" role="group" aria-label="Choose the missing amount">
+        ${r.options.map((o) => `<button type="button" class="weight ${bal.pick === o ? (balanced ? "correct" : "wrong") : ""}" data-amt="${o}" ${balanced ? "disabled" : ""}><span>₱</span>${o.toLocaleString("en-PH")}</button>`).join("")}
       </div>
       <div aria-live="polite">${fb}</div>
-      ${balanced ? `<div class="actions"><button type="button" class="key key-yellow" id="balNext">${last ? "Play again" : "Next entry →"}</button>${last ? '<a class="key key-ghost" href="#students">Start the case study →</a>' : ""}</div>` : ""}`;
+      ${balanced ? `<div class="actions"><button type="button" class="key key-yellow" id="balNext">${last ? "Play again ↻" : "Next entry →"}</button>${last ? '<a class="key key-ghost" href="#students">Start the case study →</a>' : ""}</div>` : ""}`;
 
-    $$(".amount", el).forEach((b) => b.addEventListener("click", () => {
-      bal.pick = Number(b.dataset.amt);
-      bal.tries++;
-      if (bal.pick === r.answer) {
-        good(b);
+    placeScale(bal.angle);
+    swingTo(targetAngle(t));
+
+    const choose = (amt, srcEl) => {
+      bal.pick = amt; bal.tries++;
+      if (amt === r.answer) {
+        good(srcEl || $(".bpan.target", el) || el);
         award("bal-" + bal.round, bal.tries === 1 ? 20 : 10, bal.tries === 1 ? "Balanced on the first try" : "Balanced");
       } else bad(el);
       renderBalance();
-    }));
+    };
+
+    $$(".weight", el).forEach((w) => {
+      if (w.disabled) return;
+      let drag = null;
+      w.addEventListener("pointerdown", (e) => {
+        if (e.button !== 0) return;
+        drag = { x: e.clientX, y: e.clientY, moved: false, ghost: null, over: null };
+        w.setPointerCapture(e.pointerId);
+      });
+      w.addEventListener("pointermove", (e) => {
+        if (!drag) return;
+        const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+        if (!drag.moved && Math.hypot(dx, dy) < 6) return;
+        if (!drag.moved) {
+          drag.moved = true;
+          drag.ghost = w.cloneNode(true);
+          drag.ghost.classList.add("ghost");
+          document.body.appendChild(drag.ghost);
+          w.classList.add("lifted");
+        }
+        drag.ghost.style.left = e.clientX + "px"; drag.ghost.style.top = e.clientY + "px";
+        drag.ghost.style.setProperty("--tilt", Math.max(-18, Math.min(18, dx / 6)) + "deg");
+        const under = document.elementFromPoint(e.clientX, e.clientY);
+        const pan = under && under.closest(".bpan.target");
+        if (pan !== drag.over) {
+          if (drag.over) drag.over.classList.remove("hover");
+          drag.over = pan;
+          if (pan) { pan.classList.add("hover"); swingTo(targetAngle(balTotals(Number(w.dataset.amt)))); }
+          else swingTo(targetAngle(balTotals()));
+        }
+      });
+      const end = (e, cancelled) => {
+        if (!drag) return;
+        const d = drag; drag = null;
+        if (d.ghost) d.ghost.remove();
+        w.classList.remove("lifted");
+        if (d.over) d.over.classList.remove("hover");
+        if (cancelled) { swingTo(targetAngle(balTotals())); return; }
+        if (!d.moved || d.over) choose(Number(w.dataset.amt), d.over || w);
+        else swingTo(targetAngle(balTotals()));
+      };
+      w.addEventListener("pointerup", (e) => end(e, false));
+      w.addEventListener("pointercancel", (e) => end(e, true));
+      w.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); choose(Number(w.dataset.amt), w); } });
+      w.addEventListener("click", (e) => e.preventDefault());
+    });
+
     const next = $("#balNext", el);
     if (next) next.addEventListener("click", () => {
       bal.round = (bal.round + 1) % BALANCE_ROUNDS.length;
@@ -231,33 +396,96 @@
     });
   }
 
-  /* ---------------- HOME — Think critically ---------------- */
-  let thinkPick = null;
-  function renderThink() {
-    const q = THINK_QUESTION;
+  /* ==========================================================
+     HOME — Skill check (4 competency challenges)
+     ========================================================== */
+  const sk = { i: 0, picks: SKILL_CHECKS.map(() => null), summary: false, dir: 1 };
+  const skKey = (i) => (i === 0 ? "think-1" : "skill-" + i);
+
+  function renderSkill() {
     const el = $("#thinkGame");
-    const done = thinkPick !== null;
-    const right = thinkPick === q.answer;
-    el.innerHTML = `
-      <div class="panel-top"><span class="chip">${esc(q.tag)}</span><span class="mono-k">Try it: think critically</span></div>
-      <h3>${esc(q.title)}</h3>
-      <div class="scenario">${esc(q.scenario)}</div>
-      <div class="choices two">
-        ${q.choices.map((c, i) => {
-          let cls = "";
-          if (done) cls = i === q.answer ? "correct" : (i === thinkPick ? "wrong" : "dim");
-          return `<button type="button" class="choice ${cls}" data-i="${i}" ${done ? "disabled" : ""}><span class="letter">${LETTERS[i]}</span><span>${esc(c)}</span></button>`;
-        }).join("")}
-      </div>
-      <div aria-live="polite">${done ? `<div class="feedback ${right ? "ok" : "bad"}"><b>${right ? "✓ Correct! Well done." : "Not quite."}</b>${esc(q.explain)}</div>` : ""}</div>
-      ${done ? `<div class="actions"><a class="key key-yellow" href="#sidequests">More challenges →</a>${right ? "" : '<button type="button" class="key key-ghost" id="thinkRetry">Try again</button>'}</div>` : ""}`;
+    const N = SKILL_CHECKS.length;
+    const correctCount = sk.picks.filter((p, i) => p === SKILL_CHECKS[i].answer).length;
+    const tabs = SKILL_CHECKS.map((q, i) => {
+      const p = sk.picks[i];
+      const st = p === null ? "" : p === q.answer ? "ok" : "bad";
+      return `<button type="button" class="sk-tab ${st} ${i === sk.i && !sk.summary ? "on" : ""}" data-i="${i}" title="${esc(q.tag)}">${p === null ? i + 1 : st === "ok" ? "✓" : "✗"}</button>`;
+    }).join("");
+    const head = `<div class="panel-top"><div class="sk-tabs" role="group" aria-label="Skill check questions">${tabs}</div><span class="chip sk-points">${correctCount * 10} points</span></div>`;
+
+    if (sk.summary) {
+      el.innerHTML = `${head}
+        <div class="sk-card sk-in-${sk.dir > 0 ? "r" : "l"}">
+          <span class="mono-k">Your achievement</span>
+          <h3>${correctCount === N ? "Well-rounded accountant! 🎉" : `${correctCount} of ${N} skills cleared`}</h3>
+          <ul class="sk-meter">
+            ${SKILL_CHECKS.map((q, i) => {
+              const ok = sk.picks[i] === q.answer;
+              return `<li><span>${esc(q.tag)}</span><span class="bar"><i style="width:${ok ? 100 : sk.picks[i] === null ? 0 : 35}%" class="${ok ? "" : "low"}"></i></span><b>${ok ? "✓" : "✗"}</b></li>`;
+            }).join("")}
+          </ul>
+          <p class="story">These four areas mirror the IFAC competency areas used in the study: intellectual, personal, technical, and interpersonal skills.</p>
+          <div class="actions">${correctCount < N ? '<button type="button" class="key key-yellow" id="skRetry">Retry missed ones ↻</button>' : ""}<a class="key ${correctCount < N ? "key-ghost" : "key-yellow"}" href="#sidequests">More challenges →</a></div>
+        </div>`;
+      if (correctCount === N) fx.burst($(".sk-card h3", el), 40);
+      const retry = $("#skRetry", el);
+      if (retry) retry.addEventListener("click", () => {
+        SKILL_CHECKS.forEach((q, i) => { if (sk.picks[i] !== q.answer) sk.picks[i] = null; });
+        sk.i = sk.picks.findIndex((p) => p === null); sk.summary = false; sk.dir = -1; renderSkill();
+      });
+      bindSkTabs(el);
+      return;
+    }
+
+    const q = SKILL_CHECKS[sk.i];
+    const pick = sk.picks[sk.i];
+    const done = pick !== null;
+    const right = pick === q.answer;
+    const allDone = sk.picks.every((p) => p !== null);
+    el.innerHTML = `${head}
+      <div class="sk-card sk-in-${sk.dir > 0 ? "r" : "l"}">
+        <div class="sk-meta"><span class="chip">${esc(q.tag)}</span><span class="mono-k">Try it: ${esc(q.skill)}</span></div>
+        <h3>${esc(q.title)}</h3>
+        <div class="scenario">${esc(q.scenario)}</div>
+        <div class="choices two">
+          ${q.choices.map((c, i) => {
+            let cls = "";
+            if (done) cls = i === q.answer ? "correct" : (i === pick ? "wrong" : "dim");
+            return `<button type="button" class="choice ${cls}" data-i="${i}" ${done ? "disabled" : ""}><span class="letter">${LETTERS[i]}</span><span>${esc(c)}</span></button>`;
+          }).join("")}
+        </div>
+        <div aria-live="polite">${done ? `<div class="feedback ${right ? "ok" : "bad"}"><b>${right ? "✓ Correct! Well done." : "✗ Not quite."}</b>${esc(q.explain)}</div>` : ""}</div>
+        ${done ? `<div class="actions">
+          ${allDone ? '<button type="button" class="key key-yellow" id="skSum">See my achievement ★</button>' : '<button type="button" class="key key-yellow" id="skNext">Next challenge →</button>'}
+          ${right ? "" : '<button type="button" class="key key-ghost" id="skAgain">Try again</button>'}
+        </div>` : ""}
+      </div>`;
+
     $$(".choice", el).forEach((b) => b.addEventListener("click", () => {
-      thinkPick = Number(b.dataset.i);
-      if (thinkPick === q.answer) { good(b); award("think-1", 20, "Critical thinker"); } else bad(el);
-      renderThink();
+      const i = Number(b.dataset.i);
+      sk.picks[sk.i] = i;
+      if (i === q.answer) { good(b); award(skKey(sk.i), 20, q.skill); } else bad(el);
+      sk.dir = 1;
+      renderSkill();
     }));
-    const retry = $("#thinkRetry", el);
-    if (retry) retry.addEventListener("click", () => { thinkPick = null; renderThink(); });
+    const nx = $("#skNext", el);
+    if (nx) nx.addEventListener("click", () => {
+      const nextOpen = SKILL_CHECKS.findIndex((_, k) => k > sk.i && sk.picks[k] === null);
+      sk.i = nextOpen >= 0 ? nextOpen : sk.picks.findIndex((p) => p === null);
+      sk.dir = 1; renderSkill();
+    });
+    const sm = $("#skSum", el);
+    if (sm) sm.addEventListener("click", () => { sk.summary = true; sk.dir = 1; renderSkill(); });
+    const ag = $("#skAgain", el);
+    if (ag) ag.addEventListener("click", () => { sk.picks[sk.i] = null; sk.dir = -1; renderSkill(); });
+    bindSkTabs(el);
+  }
+
+  function bindSkTabs(el) {
+    $$(".sk-tab", el).forEach((t) => t.addEventListener("click", () => {
+      const i = Number(t.dataset.i);
+      sk.dir = i >= sk.i ? 1 : -1; sk.i = i; sk.summary = false; renderSkill();
+    }));
   }
 
   /* ==========================================================
@@ -496,6 +724,7 @@
     const tabs = $("#hubTabs");
     tabs.innerHTML = HUB_TABS.map((t, i) => `<button type="button" class="sheet-tab" role="tab" id="tab-${t.id}" aria-selected="${i === hubActive}" tabindex="${i === hubActive ? 0 : -1}" data-i="${i}">${esc(t.label)}</button>`).join("");
     const t = HUB_TABS[hubActive];
+    if (!state.hubSeen.includes(t.id) && $('[data-view="hub"]') && !$('[data-view="hub"]').hidden) { state.hubSeen.push(t.id); save(); }
     $("#hubFormula").textContent = t.formula;
     const body = $("#hubBody");
     body.setAttribute("aria-labelledby", "tab-" + t.id);
@@ -674,7 +903,7 @@
   const BADGES = [
     { id: "first", icon: "₱", name: "First Entry", desc: "Earn your first XP.", test: (s) => s.xp > 0 },
     { id: "balanced", icon: "⚖", name: "Balanced Books", desc: "Balance all three entries on Home.", test: (s) => [0, 1, 2].every((i) => s.awarded["bal-" + i]) },
-    { id: "thinker", icon: "◎", name: "Critical Thinker", desc: "Solve the Think Critically challenge.", test: (s) => !!s.awarded["think-1"] },
+    { id: "thinker", icon: "◎", name: "Skill Checker", desc: "Clear all four Skill Check challenges on Home.", test: (s) => SKILL_CHECKS.every((_, i) => s.awarded[i === 0 ? "think-1" : "skill-" + i]) },
     { id: "rush", icon: "⚡", name: "Rush Hour", desc: "Score 15+ in Debit or Credit Rush.", test: (s) => s.rushBest >= 15 },
     { id: "habits", icon: "★", name: "Habit Collector", desc: "Collect all five habits.", test: (s) => s.habits.length >= HABITS.length },
     { id: "triple", icon: "▲", name: "Triple Threat", desc: "Finish all three side quests.", test: (s) => SIDE_QUESTS.every((g) => s.best[g.id] !== undefined) },
@@ -815,12 +1044,217 @@
   $("#badgeDialog").addEventListener("keydown", (e) => { if (e.key === "Escape") { e.preventDefault(); $("#badgeDialog").close(); } });
   $("#badgeDialog").addEventListener("click", (e) => { if (e.target === e.currentTarget) e.currentTarget.close(); });
 
+
+  /* ==========================================================
+     INTERACTIVE BACKGROUND (canvas)
+     - grid cells glow around the cursor
+     - floating calculator glyphs drift, parallax with scroll,
+       get pushed away by the cursor and linked to it like stars
+     - click/tap on empty space sends out a ripple
+     ========================================================== */
+  function initBackground() {
+    const cv = $("#bgCanvas");
+    if (!cv || !cv.getContext) return;
+    const ctx = cv.getContext("2d");
+    const GLYPHS = ["+", "−", "×", "÷", "₱", "%", "=", "Σ", "★"];
+    const COLORS = ["#7b8cff", "#ffd23f", "#ff8a75", "#46d6b0"];
+    const CELL = 32;
+    let W = 0, H = 0, dpr = 1, parts = [], ripples = [];
+    const mouse = { x: -9999, y: -9999, active: false };
+    let running = true;
+
+    function resize() {
+      dpr = Math.min(window.devicePixelRatio || 1, 2);
+      W = window.innerWidth; H = window.innerHeight;
+      cv.width = W * dpr; cv.height = H * dpr;
+      cv.style.width = W + "px"; cv.style.height = H + "px";
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      const target = Math.round(Math.min(46, (W * H) / 26000));
+      while (parts.length < target) parts.push(spawn(true));
+      parts.length = target;
+    }
+    function spawn(anywhere) {
+      const z = 0.3 + Math.random() * 0.7; // depth: 0.3 far .. 1 near
+      return {
+        x: Math.random() * W, y: anywhere ? Math.random() * H : H + 30,
+        vx: (Math.random() - 0.5) * 0.15, vy: -(0.12 + Math.random() * 0.25) * z,
+        z, g: GLYPHS[(Math.random() * GLYPHS.length) | 0], c: COLORS[(Math.random() * COLORS.length) | 0],
+        rot: Math.random() * Math.PI, vr: (Math.random() - 0.5) * 0.01, push: 0
+      };
+    }
+
+    let lastScroll = window.scrollY;
+    function frame() {
+      if (!running) return;
+      ctx.clearRect(0, 0, W, H);
+      const sy = window.scrollY, dScroll = sy - lastScroll; lastScroll = sy;
+
+      // 1) grid spotlight
+      if (mouse.active) {
+        const R = 150, offY = -(sy % CELL);
+        const c0 = Math.floor((mouse.x - R) / CELL), c1 = Math.ceil((mouse.x + R) / CELL);
+        const r0 = Math.floor((mouse.y - R - offY) / CELL), r1 = Math.ceil((mouse.y + R - offY) / CELL);
+        for (let c = c0; c <= c1; c++) {
+          for (let r = r0; r <= r1; r++) {
+            const x = c * CELL, y = r * CELL + offY;
+            const d = Math.hypot(x + CELL / 2 - mouse.x, y + CELL / 2 - mouse.y);
+            if (d > R) continue;
+            const a = (1 - d / R) ** 2;
+            ctx.fillStyle = `rgba(123,140,255,${(a * 0.16).toFixed(3)})`;
+            ctx.fillRect(x + 1, y + 1, CELL - 1, CELL - 1);
+            ctx.strokeStyle = `rgba(123,140,255,${(a * 0.45).toFixed(3)})`;
+            ctx.strokeRect(x + 0.5, y + 0.5, CELL, CELL);
+          }
+        }
+        // the cell right under the cursor, like a selected spreadsheet cell
+        const cx = Math.floor(mouse.x / CELL) * CELL, cy = Math.floor((mouse.y - offY) / CELL) * CELL + offY;
+        ctx.strokeStyle = "rgba(255,210,63,.7)"; ctx.lineWidth = 2;
+        ctx.strokeRect(cx + 1, cy + 1, CELL - 1, CELL - 1);
+        ctx.fillStyle = "#ffd23f"; ctx.fillRect(cx + CELL - 4, cy + CELL - 4, 5, 5);
+        ctx.lineWidth = 1;
+      }
+
+      // 2) glyphs
+      ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      for (const p of parts) {
+        p.x += p.vx; p.y += p.vy - dScroll * p.z * 0.35; // parallax with scroll
+        p.rot += p.vr;
+        if (mouse.active) {
+          const dx = p.x - mouse.x, dy = p.y - mouse.y, d = Math.hypot(dx, dy);
+          if (d < 120 && d > 0.1) {
+            const f = (1 - d / 120) * 1.6 * p.z;
+            p.x += (dx / d) * f; p.y += (dy / d) * f;
+          }
+        }
+        for (const rp of ripples) {
+          const dx = p.x - rp.x, dy = p.y - rp.y, d = Math.hypot(dx, dy);
+          if (Math.abs(d - rp.r) < 26 && d > 0.1) { p.x += (dx / d) * 3 * p.z; p.y += (dy / d) * 3 * p.z; p.vr += 0.004; }
+        }
+        p.vr *= 0.995;
+        // wrap around the edges so density stays even while scrolling
+        if (p.y < -40) p.y += H + 80; else if (p.y > H + 40) p.y -= H + 80;
+        if (p.x < -40) p.x += W + 80; else if (p.x > W + 40) p.x -= W + 80;
+        // burst glyphs slow back down to a gentle drift
+        p.vx *= 0.985; if (Math.abs(p.vx) < 0.08) p.vx = p.vx < 0 ? -0.08 : 0.08;
+        if (p.vy > -0.1 * p.z) p.vy -= 0.01; else if (p.vy < -0.4) p.vy *= 0.98;
+        const size = 12 + p.z * 16;
+        ctx.save();
+        ctx.translate(p.x, p.y); ctx.rotate(p.rot);
+        ctx.globalAlpha = 0.1 + p.z * 0.22;
+        ctx.fillStyle = p.c;
+        ctx.font = `700 ${size.toFixed(0)}px "JetBrains Mono", monospace`;
+        ctx.fillText(p.g, 0, 0);
+        ctx.restore();
+      }
+
+      // 3) constellation lines to the cursor
+      if (mouse.active) {
+        for (const p of parts) {
+          const d = Math.hypot(p.x - mouse.x, p.y - mouse.y);
+          if (d < 190) {
+            ctx.strokeStyle = `rgba(255,210,63,${((1 - d / 190) * 0.35 * p.z).toFixed(3)})`;
+            ctx.beginPath(); ctx.moveTo(mouse.x, mouse.y); ctx.lineTo(p.x, p.y); ctx.stroke();
+          }
+        }
+      }
+
+      // 4) ripples
+      ripples = ripples.filter((rp) => rp.r < rp.max);
+      for (const rp of ripples) {
+        rp.r += 6;
+        const a = 1 - rp.r / rp.max;
+        ctx.strokeStyle = `rgba(70,214,176,${(a * 0.6).toFixed(3)})`; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.arc(rp.x, rp.y, rp.r, 0, Math.PI * 2); ctx.stroke();
+        ctx.strokeStyle = `rgba(255,210,63,${(a * 0.4).toFixed(3)})`;
+        ctx.beginPath(); ctx.arc(rp.x, rp.y, rp.r * 0.6, 0, Math.PI * 2); ctx.stroke();
+        ctx.lineWidth = 1;
+      }
+
+      requestAnimationFrame(frame);
+    }
+
+    function drawStatic() {
+      ctx.clearRect(0, 0, W, H);
+      ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      for (const p of parts) {
+        ctx.globalAlpha = 0.1 + p.z * 0.18; ctx.fillStyle = p.c;
+        ctx.font = `700 ${(12 + p.z * 16).toFixed(0)}px "JetBrains Mono", monospace`;
+        ctx.fillText(p.g, p.x, p.y);
+      }
+      ctx.globalAlpha = 1;
+    }
+
+    resize();
+    window.addEventListener("resize", () => { resize(); if (reduceMotion) drawStatic(); });
+    if (reduceMotion) { drawStatic(); return; }
+
+    window.addEventListener("pointermove", (e) => { mouse.x = e.clientX; mouse.y = e.clientY; mouse.active = e.pointerType === "mouse" || e.pointerType === "pen"; }, { passive: true });
+    document.addEventListener("pointerleave", () => { mouse.active = false; });
+    window.addEventListener("blur", () => { mouse.active = false; });
+    const INTERACTIVE = "a,button,input,select,textarea,label,summary,dialog,.panel,.flip,.calc,.sheet,.card,.inventory,.sq-card,.weight,.topbar,.loader";
+    window.addEventListener("pointerdown", (e) => {
+      if (e.target.closest && e.target.closest(INTERACTIVE)) return;
+      ripples.push({ x: e.clientX, y: e.clientY, r: 4, max: Math.max(W, H) * 0.45 });
+      for (let i = 0; i < 4; i++) {
+        const p = spawn(true); p.x = e.clientX; p.y = e.clientY;
+        const a = Math.random() * Math.PI * 2; p.vx = Math.cos(a) * 1.2; p.vy = Math.sin(a) * 1.2;
+        parts.push(p); if (parts.length > 70) parts.shift();
+      }
+      fx.sound("click");
+    });
+    document.addEventListener("visibilitychange", () => {
+      const was = running; running = !document.hidden;
+      if (running && !was) { lastScroll = window.scrollY; requestAnimationFrame(frame); }
+    });
+    requestAnimationFrame(frame);
+  }
+
+
+  /* ==========================================================
+     MOBILE MENU (burger)
+     ========================================================== */
+  function initMenu() {
+    const btn = $("#menuBtn"), nav = $("#siteNav");
+    const setOpen = (on) => {
+      nav.classList.toggle("open", on);
+      btn.classList.toggle("open", on);
+      btn.setAttribute("aria-expanded", String(on));
+      btn.setAttribute("aria-label", on ? "Close menu" : "Open menu");
+    };
+    btn.addEventListener("click", (e) => { e.stopPropagation(); setOpen(!nav.classList.contains("open")); fx.sound("click"); });
+    nav.addEventListener("click", (e) => { if (e.target.closest("a")) setOpen(false); });
+    document.addEventListener("click", (e) => { if (nav.classList.contains("open") && !e.target.closest("#siteNav, #menuBtn")) setOpen(false); });
+    document.addEventListener("keydown", (e) => { if (e.key === "Escape" && nav.classList.contains("open")) { setOpen(false); btn.focus(); } });
+    window.addEventListener("hashchange", () => setOpen(false));
+    window.matchMedia("(min-width: 721px)").addEventListener("change", (m) => { if (m.matches) setOpen(false); });
+  }
+
+  /* ==========================================================
+     HERO CALCULATOR — idle life (keys press themselves)
+     ========================================================== */
+  function initCalcLife() {
+    if (reduceMotion) return;
+    const keys = $$(".calc .ck");
+    if (!keys.length) return;
+    let last = -1;
+    setInterval(() => {
+      if (document.hidden) return;
+      const calc = $(".calc");
+      if (!calc || calc.offsetParent === null || calc.classList.contains("tilting")) return;
+      let i; do { i = (Math.random() * keys.length) | 0; } while (i === last && keys.length > 1);
+      last = i;
+      keys[i].classList.add("pressed");
+      setTimeout(() => keys[i].classList.remove("pressed"), 220);
+    }, 1400);
+  }
+
   /* ---------------- Init ---------------- */
   function init() {
     $("#year").textContent = new Date().getFullYear();
     renderXP(false);
     renderBalance();
-    renderThink();
+    renderOverview();
+    renderSkill();
     renderRush();
     renderSoundBtn();
     renderInventory();
@@ -843,7 +1277,8 @@
     if (!confirm("Reset your XP, habits and scores on this device?")) return;
     state = fresh(); save();
     qs.wrong = []; qs.solved = false; sq = null; $("#sqPlayer").hidden = true;
-    bal.round = 0; bal.pick = null; bal.tries = 0; thinkPick = null;
+    bal.round = 0; bal.pick = null; bal.tries = 0; bal.angle = 0;
+    sk.i = 0; sk.picks = SKILL_CHECKS.map(() => null); sk.summary = false;
     clearInterval(rush.timer); rush.phase = "idle";
     init();
     toast("Progress reset");
@@ -851,6 +1286,9 @@
 
   initLoader();
   init();
+  initBackground();
+  initMenu();
+  initCalcLife();
   initTilt();
   initKeys();
   checkBadges();

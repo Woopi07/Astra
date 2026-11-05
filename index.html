@@ -15,6 +15,8 @@
 </head>
 <body>
   <!-- ============ 3D LOADING SCREEN ============ -->
+  <canvas class="bg-canvas" id="bgCanvas" aria-hidden="true"></canvas>
+
   <div class="loader" id="loader" role="status" aria-live="polite" aria-label="Loading ASTRA">
     <div class="loader-floor" aria-hidden="true"></div>
     <div class="loader-stage" aria-hidden="true">
@@ -47,6 +49,9 @@
       </a>
 
       <div class="hud">
+        <button type="button" class="hud-btn menu-btn" id="menuBtn" aria-expanded="false" aria-controls="siteNav" aria-label="Open menu">
+          <span class="burger" aria-hidden="true"><i></i><i></i><i></i></span>
+        </button>
         <button type="button" class="hud-btn" id="soundBtn" aria-pressed="false" title="Sound effects">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5 6 9H3v6h3l5 4z"/><path class="wave" d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13"/><path class="mute" d="m16 9 6 6M22 9l-6 6"/></svg>
           <span class="sr-only">Sound effects</span>
@@ -60,7 +65,7 @@
       </div>
     </div>
 
-    <nav class="tabs wrap" aria-label="Sections">
+    <nav class="tabs wrap" id="siteNav" aria-label="Sections">
       <a href="#home" data-tab="home" class="pill">Home</a>
       <a href="#students" data-tab="students" class="pill">Students</a>
       <a href="#hub" data-tab="hub" class="pill">Resource Hub</a>
@@ -89,7 +94,7 @@
           <div class="calc-brand"><img src="assets/logo/astra-mark.svg" alt="" width="26" height="26" /><span>ASTRA · AX-26</span></div>
           <div class="calc-screen">
             <div class="calc-sub" id="calcSub">RANK: INTERN</div>
-            <div class="calc-main" id="calcMain">0 XP</div>
+            <div class="calc-main"><span id="calcMain">0 XP</span><span class="calc-cursor" aria-hidden="true">▌</span></div>
           </div>
           <div class="calc-keys">
             <a href="#students" class="ck ck-yellow"><b>STU</b><small>Students</small></a>
@@ -107,32 +112,8 @@
           <p class="eyebrow">Overview</p>
           <h2>What's inside</h2>
         </div>
-        <div class="overview">
-          <a data-tilt class="ov ov-yellow" href="#students">
-            <span class="ov-k">For accounting students</span>
-            <strong>Five habits that pay off</strong>
-            <span>Habits for building skills that carry across systems, plus a case-study quest and side quests.</span>
-            <span class="ov-arrow" aria-hidden="true">→</span>
-          </a>
-          <a data-tilt class="ov ov-blue" href="#hub">
-            <span class="ov-k">Resource hub</span>
-            <strong>Tutorials to templates</strong>
-            <span>Software guides, exercises, videos, case studies and templates.</span>
-            <span class="ov-arrow" aria-hidden="true">→</span>
-          </a>
-          <a data-tilt class="ov ov-coral" href="#educators">
-            <span class="ov-k">For educators</span>
-            <strong>Seven approaches</strong>
-            <span>Ways to teach with software, simulations and rubrics.</span>
-            <span class="ov-arrow" aria-hidden="true">→</span>
-          </a>
-          <a data-tilt class="ov ov-mint" href="#admins">
-            <span class="ov-k">For PLV admins</span>
-            <strong>Five policies</strong>
-            <span>Suggested university policies for technology-integrated instruction.</span>
-            <span class="ov-arrow" aria-hidden="true">→</span>
-          </a>
-        </div>
+        <div class="overview" id="overview"></div>
+        <p class="note">Tap a card to flip it and see what's inside. Your progress fills the ring.</p>
       </div>
 
       <!-- Mini interactive -->
