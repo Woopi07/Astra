@@ -1022,3 +1022,9 @@ html.is-loading, html.is-loading body { overflow: hidden; }
   /* odd count: let the last tab span the full row */
   .sheet-tab:last-child:nth-child(odd) { grid-column: 1 / -1; }
 }
+
+/* ---- burger on the top-left (mobile) ---- */
+.topbar-left { display: flex; align-items: center; gap: 10px; min-width: 0; }
+@media (max-width: 720px) {
+  .topbar-left .menu-btn { order: -1; }
+}

@@ -43,15 +43,17 @@
   <!-- ============ HEADER ============ -->
   <header class="topbar">
     <div class="topbar-inner wrap">
-      <a class="brand" href="#home" aria-label="ASTRA home">
-        <img class="brand-mark" src="assets/logo/astra-mark.svg" alt="" width="38" height="38" />
-        <span>ASTRA</span>
-      </a>
+      <div class="topbar-left">
+          <button type="button" class="hud-btn menu-btn" id="menuBtn" aria-expanded="false" aria-controls="siteNav" aria-label="Open menu">
+            <span class="burger" aria-hidden="true"><i></i><i></i><i></i></span>
+          </button>
+        <a class="brand" href="#home" aria-label="ASTRA home">
+          <img class="brand-mark" src="assets/logo/astra-mark.svg" alt="" width="38" height="38" />
+          <span>ASTRA</span>
+        </a>
+      </div>
 
       <div class="hud">
-        <button type="button" class="hud-btn menu-btn" id="menuBtn" aria-expanded="false" aria-controls="siteNav" aria-label="Open menu">
-          <span class="burger" aria-hidden="true"><i></i><i></i><i></i></span>
-        </button>
         <button type="button" class="hud-btn" id="soundBtn" aria-pressed="false" title="Sound effects">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5 6 9H3v6h3l5 4z"/><path class="wave" d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13"/><path class="mute" d="m16 9 6 6M22 9l-6 6"/></svg>
           <span class="sr-only">Sound effects</span>
