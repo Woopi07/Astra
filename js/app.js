@@ -497,19 +497,33 @@
      ========================================================== */
   const qs = { wrong: [], solved: false };
 
+  let invOpen = null; // which unlocked habit is expanded
   function renderInventory(fresh) {
+    if (fresh) invOpen = fresh;
     $("#invCount").textContent = state.habits.length + " / " + HABITS.length;
     $("#invList").innerHTML = HABITS.map((h, i) => {
       const got = state.habits.includes(h.id);
-      return `<li class="inv-item ${got ? "got" : "locked"} ${fresh === h.id ? "flip-in" : ""}">
-        <span class="ic">${got ? ICONS[h.id] : ICONS.lock}</span>
-        <div>
-          <span class="item-name">${got ? esc(h.item) : "Locked · Challenge " + (i + 1)}</span>
-          <h3>${i + 1}. ${esc(h.title)}</h3>
-          ${got ? `<p>${esc(h.desc)}</p>` : ""}
-        </div>
+      if (!got) {
+        return `<li class="inv-item locked">
+          <span class="ic">${ICONS.lock}</span>
+          <div class="inv-txt"><span class="item-name">Locked · Challenge ${i + 1}</span><h3>${i + 1}. ${esc(h.title)}</h3></div>
+        </li>`;
+      }
+      const open = invOpen === h.id;
+      return `<li class="inv-item got ${open ? "open" : ""} ${fresh === h.id ? "flip-in" : ""}">
+        <button type="button" class="inv-btn" data-id="${h.id}" aria-expanded="${open}" aria-controls="inv-${h.id}">
+          <span class="ic">${ICONS[h.id]}</span>
+          <span class="inv-txt"><span class="item-name">${esc(h.item)}</span><span class="inv-title">${i + 1}. ${esc(h.title)}</span></span>
+          <span class="inv-chev" aria-hidden="true">+</span>
+        </button>
+        <p class="inv-desc" id="inv-${h.id}" ${open ? "" : "hidden"}>${esc(h.desc)}</p>
       </li>`;
     }).join("");
+    $$("#invList .inv-btn").forEach((b) => b.addEventListener("click", () => {
+      invOpen = invOpen === b.dataset.id ? null : b.dataset.id;
+      fx.sound("click");
+      renderInventory();
+    }));
   }
 
   function renderQuest() {
