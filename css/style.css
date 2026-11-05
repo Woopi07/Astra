@@ -801,3 +801,13 @@ html.is-loading, html.is-loading body { overflow: hidden; }
 @media (max-width: 380px) {
   .brand span { display: none; }
 }
+
+/* ---- Flip cards: only the visible face takes clicks ---- */
+.flip-inner .flip-back { pointer-events: none; }
+.flip-inner.flipped .flip-back { pointer-events: auto; }
+.flip-inner.flipped .flip-front { pointer-events: none; }
+.flip-back .ov-list { font-size: .8rem; gap: 4px; overflow: hidden; }
+.flip-back .ov-list li { padding-left: 20px; }
+.flip-back .ov-list li::before { width: 13px; height: 13px; }
+.ov-go { position: relative; z-index: 2; }
+.ov-go:hover { filter: brightness(1.3); }

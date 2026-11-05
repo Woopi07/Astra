@@ -222,7 +222,11 @@
         card.setAttribute("aria-pressed", String(on));
         fx.sound("click");
       };
-      card.addEventListener("click", (e) => { if (!e.target.closest("a")) toggle(); });
+      card.addEventListener("click", (e) => {
+        const link = e.target.closest("a");
+        if (link) { fx.sound("click"); return; } // let the shortcut navigate
+        toggle();
+      });
       card.addEventListener("keydown", (e) => { if ((e.key === "Enter" || e.key === " ") && e.target === card) { e.preventDefault(); toggle(); } });
     });
   }
