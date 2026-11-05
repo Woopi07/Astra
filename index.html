@@ -11,30 +11,52 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=DM+Sans:wght@400;500;700&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="css/style.css" />
+  <noscript><style>.loader{display:none!important}</style></noscript>
 </head>
 <body>
+  <!-- ============ 3D LOADING SCREEN ============ -->
+  <div class="loader" id="loader" role="status" aria-live="polite" aria-label="Loading ASTRA">
+    <div class="loader-floor" aria-hidden="true"></div>
+    <div class="loader-stage" aria-hidden="true">
+      <div class="cube">
+        <div class="face f-front"><img src="assets/logo/astra-mark.svg" alt="" /></div>
+        <div class="face f-back"><img src="assets/logo/astra-mark.svg" alt="" /></div>
+        <div class="face f-right"><span>+</span></div>
+        <div class="face f-left"><span>÷</span></div>
+        <div class="face f-top"><span>×</span></div>
+        <div class="face f-bottom"><span>−</span></div>
+      </div>
+      <div class="cube-shadow"></div>
+    </div>
+    <div class="loader-word" aria-hidden="true"><span>A</span><span>S</span><span>T</span><span>R</span><span>A</span></div>
+    <div class="loader-lcd">
+      <span id="loadMsg">Opening the books…</span>
+      <b id="loadPct">000%</b>
+    </div>
+    <div class="loader-bar"><i id="loadBar"></i></div>
+    <p class="loader-hint">Click anywhere to skip</p>
+  </div>
   <a class="skip" href="#main">Skip to content</a>
 
   <!-- ============ HEADER ============ -->
   <header class="topbar">
     <div class="topbar-inner wrap">
       <a class="brand" href="#home" aria-label="ASTRA home">
-        <svg class="brand-mark" viewBox="0 0 40 40" aria-hidden="true">
-          <rect x="2" y="2" width="36" height="36" rx="9" fill="#7b8cff"/>
-          <rect x="8" y="7" width="24" height="9" rx="2.5" fill="#0a0f2e"/>
-          <rect x="8" y="20" width="6" height="5" rx="1.5" fill="#ffd23f"/>
-          <rect x="17" y="20" width="6" height="5" rx="1.5" fill="#0a0f2e"/>
-          <rect x="26" y="20" width="6" height="12" rx="1.5" fill="#46d6b0"/>
-          <rect x="8" y="27" width="6" height="5" rx="1.5" fill="#0a0f2e"/>
-          <rect x="17" y="27" width="6" height="5" rx="1.5" fill="#ff8a75"/>
-        </svg>
+        <img class="brand-mark" src="assets/logo/astra-mark.svg" alt="" width="38" height="38" />
         <span>ASTRA</span>
       </a>
 
-      <div class="lcd" title="Your progress is saved in this browser">
-        <span class="lcd-label">XP</span>
-        <span class="lcd-value" id="xpValue">0000</span>
-        <span class="lcd-rank" id="rankValue">Intern</span>
+      <div class="hud">
+        <button type="button" class="hud-btn" id="soundBtn" aria-pressed="false" title="Sound effects">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5 6 9H3v6h3l5 4z"/><path class="wave" d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13"/><path class="mute" d="m16 9 6 6M22 9l-6 6"/></svg>
+          <span class="sr-only">Sound effects</span>
+        </button>
+        <button type="button" class="lcd" id="lcdBtn" title="View your badges (progress is saved in this browser)">
+          <span class="lcd-label">XP</span>
+          <span class="lcd-value" id="xpValue">0000</span>
+          <span class="lcd-rank" id="rankValue">Intern</span>
+          <span class="lcd-badges" id="badgeCount">0★</span>
+        </button>
       </div>
     </div>
 
@@ -63,7 +85,8 @@
         </div>
 
         <!-- calculator that doubles as navigation -->
-        <div class="calc" aria-label="Quick navigation">
+        <div class="calc" data-tilt aria-label="Quick navigation">
+          <div class="calc-brand"><img src="assets/logo/astra-mark.svg" alt="" width="26" height="26" /><span>ASTRA · AX-26</span></div>
           <div class="calc-screen">
             <div class="calc-sub" id="calcSub">RANK: INTERN</div>
             <div class="calc-main" id="calcMain">0 XP</div>
@@ -85,25 +108,25 @@
           <h2>What's inside</h2>
         </div>
         <div class="overview">
-          <a class="ov ov-yellow" href="#students">
+          <a data-tilt class="ov ov-yellow" href="#students">
             <span class="ov-k">For accounting students</span>
             <strong>Five habits that pay off</strong>
             <span>Habits for building skills that carry across systems, plus a case-study quest and side quests.</span>
             <span class="ov-arrow" aria-hidden="true">→</span>
           </a>
-          <a class="ov ov-blue" href="#hub">
+          <a data-tilt class="ov ov-blue" href="#hub">
             <span class="ov-k">Resource hub</span>
             <strong>Tutorials to templates</strong>
             <span>Software guides, exercises, videos, case studies and templates.</span>
             <span class="ov-arrow" aria-hidden="true">→</span>
           </a>
-          <a class="ov ov-coral" href="#educators">
+          <a data-tilt class="ov ov-coral" href="#educators">
             <span class="ov-k">For educators</span>
             <strong>Seven approaches</strong>
             <span>Ways to teach with software, simulations and rubrics.</span>
             <span class="ov-arrow" aria-hidden="true">→</span>
           </a>
-          <a class="ov ov-mint" href="#admins">
+          <a data-tilt class="ov ov-mint" href="#admins">
             <span class="ov-k">For PLV admins</span>
             <strong>Five policies</strong>
             <span>Suggested university policies for technology-integrated instruction.</span>
@@ -122,6 +145,7 @@
           <div class="panel" id="balanceGame"></div>
           <div class="panel" id="thinkGame"></div>
         </div>
+        <div class="panel rush" id="rushGame"></div>
       </div>
     </section>
 
@@ -218,6 +242,19 @@
   </footer>
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <!-- Badges -->
+  <dialog class="badges" id="badgeDialog" aria-labelledby="badgeTitle">
+    <div class="badges-head">
+      <div>
+        <p class="eyebrow">Your trophy case</p>
+        <h2 id="badgeTitle">Badges</h2>
+      </div>
+      <button type="button" class="hud-btn" id="badgeClose" aria-label="Close badges">✕</button>
+    </div>
+    <div class="badges-rank" id="badgeRank"></div>
+    <ul class="badge-grid" id="badgeGrid"></ul>
+  </dialog>
 
   <script src="js/data.js"></script>
   <script src="js/app.js"></script>

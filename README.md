@@ -9,6 +9,8 @@ A gamified, static website (HTML + CSS + vanilla JS, no build step) with supplem
 - **Educators**: seven suggested teaching approaches, each with "How to apply?" steps.
 - **PLV Admins**: five suggested university policies.
 
+Extras: a 3D loading screen (spinning calculator-key cube), 3D tilt cards, the timed **Debit or Credit Rush** game on Home, 10 collectible **badges** (click the XP screen in the header), confetti, an optional sound toggle, and keyboard shortcuts (1–4 / A–D to answer, Enter for next, ←/→ in Rush).
+
 XP, rank, unlocked habits, and best scores are saved in the visitor's browser (`localStorage`). "Reset my progress" in the footer clears them.
 
 ## Editing content
@@ -26,3 +28,6 @@ npx serve .
 
 ## Deploy
 Import the repo into Vercel or Netlify, or turn on GitHub Pages. No build settings are needed.
+
+## Logo
+`assets/logo/astra-mark.svg` is the ASTRA mark: a raised calculator key with a four-point star (*astra* means "stars") and the + − × ÷ operators in the corners. `astra-logo-horizontal.svg` is the mark with the wordmark. `assets/favicon.svg` is a copy of the mark.

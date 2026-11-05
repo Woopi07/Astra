@@ -13,13 +13,18 @@
 
   /* ---------------- Progress (saved per browser) ---------------- */
   const KEY = "astra-progress-v1";
-  const fresh = () => ({ xp: 0, awarded: {}, habits: [], questStep: 0, questStarted: false, best: {}, seenEdu: [], seenAdm: [] });
+  const fresh = () => ({ xp: 0, awarded: {}, habits: [], questStep: 0, questStarted: false, best: {}, seenEdu: [], seenAdm: [], badges: [], rushBest: 0, sound: false });
   let state = fresh();
   try {
     const raw = localStorage.getItem(KEY);
     if (raw) state = Object.assign(fresh(), JSON.parse(raw));
   } catch (e) { /* storage unavailable: progress lasts this visit only */ }
-  const save = () => { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) { /* ignore */ } };
+  const persist = () => { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) { /* ignore */ } };
+  let badgeCheckQueued = false;
+  const save = () => {
+    persist();
+    if (!badgeCheckQueued) { badgeCheckQueued = true; setTimeout(() => { badgeCheckQueued = false; checkBadges(); }, 0); }
+  };
 
   const rankFor = (xp) => RANKS.reduce((r, k) => (xp >= k.min ? k : r), RANKS[0]);
 
@@ -30,6 +35,7 @@
     $("#calcMain").textContent = state.xp + " XP";
     const next = RANKS.find((r) => r.min > state.xp);
     $("#calcSub").textContent = "RANK: " + rank.name.toUpperCase() + (next ? " · NEXT AT " + next.min : " · MAX");
+    $("#badgeCount").textContent = state.badges.length + "★";
     if (bump && !reduceMotion) {
       const lcd = $(".lcd");
       lcd.classList.remove("bump"); void lcd.offsetWidth; lcd.classList.add("bump");
@@ -45,18 +51,86 @@
     save();
     renderXP(true);
     const after = rankFor(state.xp).name;
-    toast(after !== before ? `Rank up! You're now a ${after}` : `+${amount} XP${label ? " · " + label : ""}`);
+    if (after !== before) { toast(`Rank up! You're now a ${after}`); fx.sound("level"); fx.burst(null, 70); }
+    else toast(`+${amount} XP${label ? " · " + label : ""}`);
     return amount;
   }
 
-  let toastTimer;
+  const toastQueue = [];
+  let toastBusy = false;
   function toast(msg) {
+    toastQueue.push(msg);
+    if (!toastBusy) nextToast();
+  }
+  function nextToast() {
     const t = $("#toast");
+    const msg = toastQueue.shift();
+    if (!msg) { toastBusy = false; return; }
+    toastBusy = true;
     t.textContent = msg;
     t.classList.add("show");
-    clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => t.classList.remove("show"), 2200);
+    setTimeout(() => { t.classList.remove("show"); setTimeout(nextToast, 300); }, 1900);
   }
+
+  /* ---------------- Effects: sound + confetti ---------------- */
+  const fx = (() => {
+    let ctx = null;
+    const tones = {
+      ok: [[660, 0], [880, 0.08]],
+      bad: [[220, 0], [180, 0.09]],
+      click: [[520, 0]],
+      level: [[523, 0], [659, 0.1], [784, 0.2], [1047, 0.3]],
+      badge: [[784, 0], [1175, 0.12]]
+    };
+    function sound(name) {
+      if (!state.sound) return;
+      try {
+        ctx = ctx || new (window.AudioContext || window.webkitAudioContext)();
+        (tones[name] || tones.click).forEach(([f, at]) => {
+          const o = ctx.createOscillator(), g = ctx.createGain();
+          o.type = name === "bad" ? "sawtooth" : "triangle";
+          o.frequency.value = f;
+          const t0 = ctx.currentTime + at;
+          g.gain.setValueAtTime(0.0001, t0);
+          g.gain.exponentialRampToValueAtTime(0.12, t0 + 0.01);
+          g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.18);
+          o.connect(g).connect(ctx.destination);
+          o.start(t0); o.stop(t0 + 0.2);
+        });
+      } catch (e) { /* audio unavailable */ }
+    }
+    const COLORS = ["#ffd23f", "#7b8cff", "#ff8a75", "#46d6b0", "#eef1ff"];
+    const GLYPHS = ["+", "−", "×", "÷", "₱", "★"];
+    function burst(origin, n = 26) {
+      if (reduceMotion) return;
+      let x = window.innerWidth / 2, y = window.innerHeight / 3;
+      if (origin && origin.getBoundingClientRect) {
+        const r = origin.getBoundingClientRect();
+        if (!r.width && !r.height) return;
+        x = r.left + r.width / 2; y = r.top + r.height / 2;
+      }
+      for (let i = 0; i < n; i++) {
+        const el = document.createElement("span");
+        el.className = "confetti";
+        const glyph = Math.random() < 0.45;
+        el.textContent = glyph ? GLYPHS[i % GLYPHS.length] : "";
+        el.style.cssText = `left:${x}px;top:${y}px;color:${COLORS[i % COLORS.length]};${glyph ? "" : "background:" + COLORS[i % COLORS.length] + ";"}`;
+        document.body.appendChild(el);
+        const ang = Math.random() * Math.PI * 2, dist = 80 + Math.random() * 180;
+        const dx = Math.cos(ang) * dist, dy = Math.sin(ang) * dist - 120;
+        el.animate([
+          { transform: "translate(-50%,-50%) rotate3d(1,1,0,0deg) scale(1)", opacity: 1 },
+          { transform: `translate(calc(-50% + ${dx}px), calc(-50% + ${dy + 260}px)) rotate3d(1,1,0,${540 + Math.random() * 540}deg) scale(.6)`, opacity: 0 }
+        ], { duration: 1000 + Math.random() * 700, easing: "cubic-bezier(.2,.7,.4,1)" }).onfinish = () => el.remove();
+      }
+    }
+    return { sound, burst };
+  })();
+  const good = (el, n) => { fx.sound("ok"); fx.burst(el, n || 18); };
+  const bad = (el) => {
+    fx.sound("bad");
+    if (el && !reduceMotion) el.animate([{ transform: "translateX(0)" }, { transform: "translateX(-6px)" }, { transform: "translateX(6px)" }, { transform: "translateX(0)" }], { duration: 260 });
+  };
 
   function shuffle(arr) {
     const a = arr.slice();
@@ -143,8 +217,10 @@
     $$(".amount", el).forEach((b) => b.addEventListener("click", () => {
       bal.pick = Number(b.dataset.amt);
       bal.tries++;
-      if (bal.pick === r.answer && bal.tries === 1) award("bal-" + bal.round, 20, "Balanced on the first try");
-      else if (bal.pick === r.answer) award("bal-" + bal.round, 10, "Balanced");
+      if (bal.pick === r.answer) {
+        good(b);
+        award("bal-" + bal.round, bal.tries === 1 ? 20 : 10, bal.tries === 1 ? "Balanced on the first try" : "Balanced");
+      } else bad(el);
       renderBalance();
     }));
     const next = $("#balNext", el);
@@ -177,7 +253,7 @@
       ${done ? `<div class="actions"><a class="key key-yellow" href="#sidequests">More challenges →</a>${right ? "" : '<button type="button" class="key key-ghost" id="thinkRetry">Try again</button>'}</div>` : ""}`;
     $$(".choice", el).forEach((b) => b.addEventListener("click", () => {
       thinkPick = Number(b.dataset.i);
-      if (thinkPick === q.answer) award("think-1", 20, "Critical thinker");
+      if (thinkPick === q.answer) { good(b); award("think-1", 20, "Critical thinker"); } else bad(el);
       renderThink();
     }));
     const retry = $("#thinkRetry", el);
@@ -189,11 +265,11 @@
      ========================================================== */
   const qs = { wrong: [], solved: false };
 
-  function renderInventory() {
+  function renderInventory(fresh) {
     $("#invCount").textContent = state.habits.length + " / " + HABITS.length;
     $("#invList").innerHTML = HABITS.map((h, i) => {
       const got = state.habits.includes(h.id);
-      return `<li class="inv-item ${got ? "got" : "locked"}">
+      return `<li class="inv-item ${got ? "got" : "locked"} ${fresh === h.id ? "flip-in" : ""}">
         <span class="ic">${got ? ICONS[h.id] : ICONS.lock}</span>
         <div>
           <span class="item-name">${got ? esc(h.item) : "Locked · Challenge " + (i + 1)}</span>
@@ -233,6 +309,7 @@
           <a class="key key-yellow" href="#sidequests">Take on the side quests →</a>
           <button type="button" class="key key-ghost" id="qReplay">Replay case study</button>
         </div>`;
+      fx.burst($(".trophy .big", el), 60);
       $("#qReplay", el).addEventListener("click", () => { state.questStep = 0; qs.wrong = []; qs.solved = false; save(); renderQuest(); });
       return;
     }
@@ -265,12 +342,15 @@
       const i = Number(b.dataset.i);
       if (i === c.answer) {
         qs.solved = true;
-        if (!state.habits.includes(habit.id)) state.habits.push(habit.id);
+        const isNew = !state.habits.includes(habit.id);
+        if (isNew) state.habits.push(habit.id);
         save();
+        good(b, 34);
         award("quest-" + step, qs.wrong.length ? 50 : 100, habit.item + " acquired");
-        renderInventory();
+        renderInventory(isNew ? habit.id : null);
       } else {
         qs.wrong.push(i);
+        bad(el);
       }
       renderQuest();
     }));
@@ -287,7 +367,7 @@
   function renderSQGrid() {
     $("#sqGrid").innerHTML = SIDE_QUESTS.map((g, n) => {
       const best = state.best[g.id];
-      return `<button type="button" class="sq-card bg-${g.color}" data-g="${n}">
+      return `<button type="button" class="sq-card bg-${g.color}" data-tilt data-g="${n}">
         <span class="n">Side quest ${n + 1} · ${esc(g.focus)}</span>
         <span class="sq-title">${esc(g.title)}</span>
         <span class="sq-desc">${esc(g.objective)}</span>
@@ -299,7 +379,7 @@
 
   function startSQ(n) {
     const game = SIDE_QUESTS[n];
-    sq = { game, i: -1, score: 0, pick: null, order: [] };
+    sq = { game, i: -1, score: 0, pick: null, order: [], streak: 0, maxStreak: 0 };
     const p = $("#sqPlayer");
     p.hidden = false;
     renderSQ();
@@ -334,15 +414,16 @@
           <span class="mono-k">Side quest complete</span>
           <div class="big">${sq.score} / ${total}</div>
           <h3>${esc(msg)}</h3>
-          <p class="story">Best score: ${state.best[g.id]} / ${total}</p>
+          <p class="story">Best score: ${state.best[g.id]} / ${total} · Longest streak: ${sq.maxStreak}</p>
         </div>
         <div class="actions" style="justify-content:center">
           <button type="button" class="key key-yellow" id="sqAgain">Play again</button>
           <button type="button" class="key key-ghost" data-close>Choose another quest</button>
         </div>`;
-      $("#sqAgain", p).addEventListener("click", () => { sq.i = -1; sq.score = 0; nextSQ(); });
+      $("#sqAgain", p).addEventListener("click", () => { sq.i = -1; sq.score = 0; sq.streak = 0; sq.maxStreak = 0; nextSQ(); });
       bindClose(p);
       renderSQGrid();
+      if (pct >= .8) { fx.sound("level"); fx.burst($(".trophy .big", p), 60); }
       return;
     }
 
@@ -352,7 +433,7 @@
     const right = done && sq.order[sq.pick] === q.answer;
 
     p.innerHTML = `
-      <div class="panel-top"><span class="chip">${esc(g.title)}</span><span class="sq-score">Score ${sq.score} · ${String(sq.i + 1).padStart(2, "0")} / ${g.items.length}</span></div>
+      <div class="panel-top"><span class="chip">${esc(g.title)}</span><span class="sq-score">${sq.streak >= 2 ? `<span class="streak">Streak ×${sq.streak}</span>` : ""}Score ${sq.score} · ${String(sq.i + 1).padStart(2, "0")} / ${g.items.length}</span></div>
       <div class="quest-progress" aria-hidden="true">${g.items.map((_, k) => `<i class="${k < sq.i ? "done" : k === sq.i ? "now" : ""}"></i>`).join("")}</div>
       <span class="mono-k">Activity ${sq.i + 1}</span>
       <h3>${esc(q.title)}</h3>
@@ -375,7 +456,14 @@
       sq.pick = Number(b.dataset.pos);
       if (sq.order[sq.pick] === q.answer) {
         sq.score++;
+        sq.streak++;
+        sq.maxStreak = Math.max(sq.maxStreak, sq.streak);
+        good(b, sq.streak >= 3 ? 40 : 18);
+        if (sq.streak === 3 || sq.streak === 5 || sq.streak === 10) toast(`Streak ×${sq.streak}! Keep it going`);
         award(g.id + "-" + sq.i, 10);
+      } else {
+        sq.streak = 0;
+        bad(p);
       }
       renderSQ();
       const nb = $("#sqNext", p); if (nb) nb.focus({ preventScroll: true });
@@ -484,12 +572,257 @@
     }));
   }
 
+
+  /* ==========================================================
+     HOME — Debit or Credit Rush (timed)
+     ========================================================== */
+  const RUSH_TIME = 30;
+  const rush = { phase: "idle", score: 0, streak: 0, best: 0, deck: [], cur: null, left: RUSH_TIME, timer: null, last: null };
+
+  function renderRush() {
+    const el = $("#rushGame");
+    if (rush.phase === "idle" || rush.phase === "over") {
+      const over = rush.phase === "over";
+      el.innerHTML = `
+        <div class="rush-intro">
+          <div>
+            <span class="mono-k">Speed round · ${RUSH_TIME} seconds</span>
+            <h3>${over ? `Time's up! You scored <span class="hl">${rush.score}</span>` : "Debit or Credit Rush"}</h3>
+            <p class="story">${over
+              ? `Best: ${state.rushBest} · Longest streak: ${rush.best}. ${rush.score >= 15 ? "Lightning-fast ledger work!" : rush.score >= 10 ? "Great instincts. Can you hit 15?" : "Remember DEALER: Drawings, Expenses, Assets increase with debits; Liabilities, Equity, Revenue increase with credits."}`
+              : "An account change flashes on the card. Decide if it's recorded as a <b>debit</b> or a <b>credit</b> before time runs out. Use the buttons, or press <kbd>←</kbd>/<kbd>D</kbd> for debit and <kbd>→</kbd>/<kbd>C</kbd> for credit."}</p>
+            <div class="actions"><button type="button" class="key key-yellow" id="rushStart">${over ? "Play again ↻" : "Start rush ▶"}</button>
+            <span class="chip">Personal best: ${state.rushBest}</span></div>
+          </div>
+          <div class="rush-preview" aria-hidden="true">
+            <div class="rush-card demo"><span class="rush-type">Asset</span><strong>Cash increases</strong><span class="rush-q">Debit or credit?</span></div>
+          </div>
+        </div>`;
+      $("#rushStart", el).addEventListener("click", startRush);
+      return;
+    }
+    // playing
+    const c = rush.cur;
+    el.innerHTML = `
+      <div class="panel-top">
+        <span class="mono-k">Debit or Credit Rush</span>
+        <span class="rush-stats"><span class="chip">Score <b id="rushScore">${rush.score}</b></span><span class="chip ${rush.streak >= 3 ? "hot" : ""}">Streak ×${rush.streak}</span><span class="chip">⏱ <b id="rushLeft">${rush.left}</b>s</span></span>
+      </div>
+      <div class="bar rush-time"><i id="rushBar" style="width:${(rush.left / RUSH_TIME) * 100}%"></i></div>
+      <div class="rush-stage">
+        <div class="rush-card ${rush.last ? "flash-" + rush.last : ""}" id="rushCard">
+          <span class="rush-type">${esc(c.type)}</span>
+          <strong>${esc(c.t)}</strong>
+          <span class="rush-q">Debit or credit?</span>
+        </div>
+      </div>
+      <div class="rush-btns">
+        <button type="button" class="key rush-d" data-a="D">← Debit</button>
+        <button type="button" class="key rush-c" data-a="C">Credit →</button>
+      </div>`;
+    $$(".rush-btns .key", el).forEach((b) => b.addEventListener("click", () => answerRush(b.dataset.a, b)));
+  }
+
+  function startRush() {
+    rush.phase = "play"; rush.score = 0; rush.streak = 0; rush.best = 0; rush.left = RUSH_TIME; rush.last = null;
+    rush.deck = shuffle(RUSH_ITEMS);
+    rush.cur = rush.deck.pop();
+    clearInterval(rush.timer);
+    rush.timer = setInterval(() => {
+      rush.left--;
+      const l = $("#rushLeft"), bar = $("#rushBar");
+      if (l) l.textContent = rush.left;
+      if (bar) bar.style.width = (rush.left / RUSH_TIME) * 100 + "%";
+      if (rush.left <= 5 && rush.left > 0) fx.sound("click");
+      if (rush.left <= 0) endRush();
+    }, 1000);
+    fx.sound("click");
+    renderRush();
+  }
+
+  function answerRush(a, btn) {
+    if (rush.phase !== "play") return;
+    const right = a === rush.cur.a;
+    if (right) {
+      rush.score++; rush.streak++; rush.best = Math.max(rush.best, rush.streak);
+      fx.sound("ok");
+      if (rush.streak % 5 === 0) fx.burst(btn || $("#rushCard"), 24);
+    } else {
+      rush.streak = 0; fx.sound("bad");
+      toast(`${rush.cur.t} → ${rush.cur.a === "D" ? "Debit" : "Credit"}`);
+    }
+    rush.last = right ? "ok" : "bad";
+    if (!rush.deck.length) rush.deck = shuffle(RUSH_ITEMS);
+    rush.cur = rush.deck.pop();
+    renderRush();
+  }
+
+  function endRush() {
+    clearInterval(rush.timer);
+    rush.phase = "over";
+    if (rush.score > state.rushBest) { state.rushBest = rush.score; save(); }
+    if (rush.score >= 5) award("rush-5", 20, "Rush: 5 correct");
+    if (rush.score >= 10) award("rush-10", 30, "Rush: 10 correct");
+    if (rush.score >= 15) award("rush-15", 40, "Rush: 15 correct");
+    if (rush.score >= 10) fx.burst($("#rushGame"), 50);
+    renderRush();
+  }
+
+  /* ==========================================================
+     BADGES
+     ========================================================== */
+  const BADGES = [
+    { id: "first", icon: "₱", name: "First Entry", desc: "Earn your first XP.", test: (s) => s.xp > 0 },
+    { id: "balanced", icon: "⚖", name: "Balanced Books", desc: "Balance all three entries on Home.", test: (s) => [0, 1, 2].every((i) => s.awarded["bal-" + i]) },
+    { id: "thinker", icon: "◎", name: "Critical Thinker", desc: "Solve the Think Critically challenge.", test: (s) => !!s.awarded["think-1"] },
+    { id: "rush", icon: "⚡", name: "Rush Hour", desc: "Score 15+ in Debit or Credit Rush.", test: (s) => s.rushBest >= 15 },
+    { id: "habits", icon: "★", name: "Habit Collector", desc: "Collect all five habits.", test: (s) => s.habits.length >= HABITS.length },
+    { id: "triple", icon: "▲", name: "Triple Threat", desc: "Finish all three side quests.", test: (s) => SIDE_QUESTS.every((g) => s.best[g.id] !== undefined) },
+    { id: "flawless", icon: "✓", name: "Flawless", desc: "Score 10/10 in any side quest.", test: (s) => SIDE_QUESTS.some((g) => s.best[g.id] === g.items.length) },
+    { id: "mentor", icon: "✎", name: "Mentor's Map", desc: "Explore all seven teaching approaches.", test: (s) => s.seenEdu.length >= APPROACHES.length },
+    { id: "compass", icon: "⌖", name: "Campus Compass", desc: "Explore all five university policies.", test: (s) => s.seenAdm.length >= POLICIES.length },
+    { id: "cpa", icon: "♛", name: "CPA-Ready", desc: "Reach the top rank.", test: (s) => s.xp >= RANKS[RANKS.length - 1].min }
+  ];
+
+  function checkBadges() {
+    let changed = false;
+    BADGES.forEach((b) => {
+      if (!state.badges.includes(b.id) && b.test(state)) {
+        state.badges.push(b.id); changed = true;
+        toast(`Badge unlocked: ${b.icon} ${b.name}`);
+        fx.sound("badge");
+        fx.burst($("#lcdBtn"), 30);
+      }
+    });
+    if (changed) { persist(); renderXP(true); if ($("#badgeDialog").open) renderBadges(); }
+  }
+
+  function renderBadges() {
+    const rank = rankFor(state.xp);
+    const next = RANKS.find((r) => r.min > state.xp);
+    const pct = next ? ((state.xp - rank.min) / (next.min - rank.min)) * 100 : 100;
+    $("#badgeRank").innerHTML = `
+      <div class="br-top"><span><b>${esc(rank.name)}</b> · ${state.xp} XP</span><span class="muted">${next ? `${next.min - state.xp} XP to ${esc(next.name)}` : "Top rank reached"}</span></div>
+      <div class="bar"><i style="width:${pct}%"></i></div>`;
+    $("#badgeGrid").innerHTML = BADGES.map((b) => {
+      const got = state.badges.includes(b.id);
+      return `<li class="badge ${got ? "got" : ""}"><span class="badge-coin"><span>${got ? b.icon : "?"}</span></span><b>${esc(b.name)}</b><small>${esc(b.desc)}</small></li>`;
+    }).join("");
+  }
+
+  /* ==========================================================
+     3D TILT (pointer-follow perspective + glare)
+     ========================================================== */
+  function initTilt() {
+    if (reduceMotion || !window.matchMedia("(hover: hover) and (pointer: fine)").matches) return;
+    let cur = null;
+    const reset = (el) => { el.style.setProperty("--rx", "0deg"); el.style.setProperty("--ry", "0deg"); el.classList.remove("tilting"); };
+    document.addEventListener("pointermove", (e) => {
+      const el = e.target.closest && e.target.closest("[data-tilt]");
+      if (cur && cur !== el) reset(cur);
+      cur = el;
+      if (!el) return;
+      const r = el.getBoundingClientRect();
+      const px = (e.clientX - r.left) / r.width, py = (e.clientY - r.top) / r.height;
+      const max = el.classList.contains("calc") ? 14 : 9;
+      el.style.setProperty("--rx", ((0.5 - py) * max).toFixed(2) + "deg");
+      el.style.setProperty("--ry", ((px - 0.5) * max).toFixed(2) + "deg");
+      el.style.setProperty("--mx", (px * 100).toFixed(1) + "%");
+      el.style.setProperty("--my", (py * 100).toFixed(1) + "%");
+      el.classList.add("tilting");
+    }, { passive: true });
+    document.addEventListener("pointerleave", () => { if (cur) reset(cur); cur = null; });
+  }
+
+  /* ==========================================================
+     LOADER (3D cube) 
+     ========================================================== */
+  function initLoader() {
+    const L = $("#loader");
+    if (!L) return;
+    const msgs = ["Opening the books…", "Posting journal entries…", "Balancing the ledger…", "Reconciling accounts…", "Closing the period…", "Ready!"];
+    const minTime = reduceMotion ? 300 : 2000;
+    const start = performance.now();
+    let loaded = document.readyState === "complete", finished = false;
+    window.addEventListener("load", () => { loaded = true; });
+    const pctEl = $("#loadPct"), bar = $("#loadBar"), msg = $("#loadMsg");
+    document.documentElement.classList.add("is-loading");
+    function finish() {
+      if (finished) return;
+      finished = true;
+      pctEl.textContent = "100%"; bar.style.width = "100%"; msg.textContent = msgs[msgs.length - 1];
+      L.classList.add("done");
+      document.documentElement.classList.remove("is-loading");
+      setTimeout(() => L.remove(), reduceMotion ? 50 : 900);
+    }
+    function tick(now) {
+      if (finished) return;
+      const t = Math.min(1, (now - start) / minTime);
+      const shown = Math.floor((loaded ? t : Math.min(t, 0.9)) * 100);
+      pctEl.textContent = String(shown).padStart(3, "0") + "%";
+      bar.style.width = shown + "%";
+      msg.textContent = msgs[Math.min(msgs.length - 2, Math.floor(shown / 20))];
+      if (t >= 1 && loaded) { setTimeout(finish, 250); return; }
+      requestAnimationFrame(tick);
+    }
+    requestAnimationFrame(tick);
+    L.addEventListener("click", finish);
+    document.addEventListener("keydown", (e) => { if (e.key === "Escape" || e.key === "Enter") finish(); }, { once: true });
+    setTimeout(finish, 6000); // safety net
+  }
+
+  /* ==========================================================
+     KEYBOARD SHORTCUTS
+     ========================================================== */
+  function initKeys() {
+    document.addEventListener("keydown", (e) => {
+      if (e.ctrlKey || e.metaKey || e.altKey || $("#loader:not(.done)") || $("#badgeDialog").open) return;
+      const tag = (e.target.tagName || "").toLowerCase();
+      if (tag === "input" || tag === "textarea" || tag === "select") return;
+      const view = ($(".view:not([hidden])") || {}).dataset?.view;
+      const k = e.key.toLowerCase();
+
+      if (view === "home" && rush.phase === "play") {
+        if (k === "arrowleft" || k === "d") { e.preventDefault(); answerRush("D", $(".rush-d")); }
+        if (k === "arrowright" || k === "c") { e.preventDefault(); answerRush("C", $(".rush-c")); }
+        return;
+      }
+      if (view !== "students") return;
+      const panel = !$("#sqPlayer").hidden ? $("#sqPlayer") : $("#questPanel");
+      const idx = "1234".indexOf(k) >= 0 ? "1234".indexOf(k) : "abcd".indexOf(k);
+      if (idx >= 0 && k.length === 1) {
+        const btn = $$(".choice:not([disabled])", panel).find((b) => (b.dataset.pos ?? b.dataset.i) === String(idx));
+        if (btn) { e.preventDefault(); btn.click(); }
+      } else if (k === "enter" && tag !== "button" && tag !== "a") {
+        const go = $("#sqNext, #sqGo, #qNext, #qStart", panel);
+        if (go) { e.preventDefault(); go.click(); }
+      }
+    });
+  }
+
+  /* ==========================================================
+     HUD: sound toggle + badges dialog
+     ========================================================== */
+  function renderSoundBtn() {
+    const b = $("#soundBtn");
+    b.setAttribute("aria-pressed", String(!!state.sound));
+    b.classList.toggle("on", !!state.sound);
+    b.title = state.sound ? "Sound on (click to mute)" : "Sound off (click to unmute)";
+  }
+  $("#soundBtn").addEventListener("click", () => { state.sound = !state.sound; persist(); renderSoundBtn(); fx.sound("click"); });
+  $("#lcdBtn").addEventListener("click", () => { renderBadges(); $("#badgeDialog").showModal(); });
+  $("#badgeClose").addEventListener("click", () => $("#badgeDialog").close());
+  $("#badgeDialog").addEventListener("keydown", (e) => { if (e.key === "Escape") { e.preventDefault(); $("#badgeDialog").close(); } });
+  $("#badgeDialog").addEventListener("click", (e) => { if (e.target === e.currentTarget) e.currentTarget.close(); });
+
   /* ---------------- Init ---------------- */
   function init() {
     $("#year").textContent = new Date().getFullYear();
     renderXP(false);
     renderBalance();
     renderThink();
+    renderRush();
+    renderSoundBtn();
     renderInventory();
     renderQuest();
     renderSQGrid();
@@ -511,9 +844,14 @@
     state = fresh(); save();
     qs.wrong = []; qs.solved = false; sq = null; $("#sqPlayer").hidden = true;
     bal.round = 0; bal.pick = null; bal.tries = 0; thinkPick = null;
+    clearInterval(rush.timer); rush.phase = "idle";
     init();
     toast("Progress reset");
   });
 
+  initLoader();
   init();
+  initTilt();
+  initKeys();
+  checkBadges();
 })();

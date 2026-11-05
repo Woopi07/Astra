@@ -708,3 +708,36 @@ const RANKS = [
   { min: 550, name: "Senior Accountant" },
   { min: 800, name: "CPA-Ready" }
 ];
+
+/* ---------- Home: Debit or Credit Rush ----------
+   a: "D" = debit, "C" = credit. type is shown as a hint tag. */
+const RUSH_ITEMS = [
+  { t: "Cash increases", type: "Asset", a: "D" },
+  { t: "Cash decreases", type: "Asset", a: "C" },
+  { t: "Accounts Receivable increases", type: "Asset", a: "D" },
+  { t: "A customer pays their receivable", type: "Accounts Receivable", a: "C" },
+  { t: "Equipment is purchased", type: "Asset", a: "D" },
+  { t: "Supplies are used up", type: "Supplies (asset)", a: "C" },
+  { t: "Prepaid Insurance increases", type: "Asset", a: "D" },
+  { t: "Inventory increases", type: "Asset", a: "D" },
+  { t: "Inventory is sold", type: "Inventory (asset)", a: "C" },
+  { t: "Accounts Payable increases", type: "Liability", a: "C" },
+  { t: "Accounts Payable is paid", type: "Liability", a: "D" },
+  { t: "Unearned Revenue increases", type: "Liability", a: "C" },
+  { t: "Unearned Revenue is earned", type: "Unearned Revenue (liability)", a: "D" },
+  { t: "Notes Payable increases", type: "Liability", a: "C" },
+  { t: "A bank loan is repaid", type: "Notes Payable (liability)", a: "D" },
+  { t: "Interest Payable increases", type: "Liability", a: "C" },
+  { t: "Owner invests more capital", type: "Owner's Capital (equity)", a: "C" },
+  { t: "Owner's Drawings increase", type: "Equity (contra)", a: "D" },
+  { t: "Service Revenue is earned", type: "Revenue", a: "C" },
+  { t: "Sales Revenue increases", type: "Revenue", a: "C" },
+  { t: "Sales Returns increase", type: "Contra revenue", a: "D" },
+  { t: "Rent Expense is incurred", type: "Expense", a: "D" },
+  { t: "Salaries Expense is incurred", type: "Expense", a: "D" },
+  { t: "Utilities Expense is incurred", type: "Expense", a: "D" },
+  { t: "Depreciation Expense is recorded", type: "Expense", a: "D" },
+  { t: "Accumulated Depreciation increases", type: "Contra asset", a: "C" },
+  { t: "Allowance for Doubtful Accounts increases", type: "Contra asset", a: "C" },
+  { t: "Bad Debt Expense is recognized", type: "Expense", a: "D" }
+];
