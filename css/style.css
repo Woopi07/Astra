@@ -1116,3 +1116,10 @@ html.no-motion .rush-card.demo, html.no-motion .badge.got .badge-coin, html.no-m
 html.no-motion .loader-music.on { animation: none !important; }
 html.no-motion [data-tilt] { --rx: 0deg !important; --ry: 0deg !important; }
 html.no-motion [data-tilt]::after { display: none; }
+
+/* settings: icon-only on desktop, labelled in the phone menu */
+@media (min-width: 721px) {
+  .pill-settings { width: 42px; height: 42px; padding: 0; justify-content: center; border-radius: 50%; align-self: center; }
+  .pill-settings svg { width: 20px; height: 20px; }
+  .pill-settings-txt { display: none; }
+}
