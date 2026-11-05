@@ -147,6 +147,17 @@
     return a;
   }
 
+  /* ---------------- Music follows what you're doing ---------------- */
+  function updateMusicContext() {
+    if (typeof musicCtl === "undefined") return;
+    const view = ($(".view:not([hidden])") || {}).dataset?.view || "home";
+    let c = view;
+    if (view === "home" && rush.phase === "play") c = "rush";
+    if (view === "students" && sq && !$("#sqPlayer").hidden) c = "sidequest";
+    musicCtl.setContext(c);
+    if (c !== "rush") musicCtl.tempo(1);
+  }
+
   /* ---------------- Router ---------------- */
   const VIEWS = ["home", "students", "hub", "educators", "admins"];
   function route() {
@@ -155,6 +166,7 @@
     $$(".view").forEach((v) => { v.hidden = v.dataset.view !== target; });
     if (target === "home" && $("#overview")) renderOverview();
     if (target === "hub" && $("#hubTabs").children.length) renderHub();
+    updateMusicContext();
     $$(".pill").forEach((p) => {
       const on = p.dataset.tab === target;
       p.classList.toggle("active", on);
@@ -638,6 +650,7 @@
     const p = $("#sqPlayer");
     p.hidden = false;
     renderSQ();
+    updateMusicContext();
     p.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "start" });
   }
 
@@ -739,6 +752,7 @@
   function bindClose(p) {
     $$("[data-close]", p).forEach((b) => b.addEventListener("click", () => {
       p.hidden = true; sq = null;
+      updateMusicContext();
       $("#sidequests").scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "start" });
     }));
   }
@@ -1197,10 +1211,12 @@
       if (l) l.textContent = rush.left;
       if (bar) bar.style.width = (rush.left / RUSH_TIME) * 100 + "%";
       if (rush.left <= 5 && rush.left > 0) fx.sound("click");
+      if (rush.left === 10) musicCtl.tempo(1.18); // the beat speeds up for the final stretch
       if (rush.left <= 0) endRush();
     }, 1000);
     fx.sound("click");
     renderRush();
+    updateMusicContext();
   }
 
   function answerRush(a, btn) {
@@ -1223,6 +1239,7 @@
   function endRush() {
     clearInterval(rush.timer);
     rush.phase = "over";
+    updateMusicContext();
     if (rush.score > state.rushBest) { state.rushBest = rush.score; save(); }
     if (rush.score >= 5) award("rush-5", 20, "Rush: 5 correct");
     if (rush.score >= 10) award("rush-10", 30, "Rush: 10 correct");
@@ -1354,6 +1371,22 @@
       chords: [[60, 64, 67], [55, 59, 62], [57, 60, 64], [53, 57, 60]],
       arpWave: "square", arpVol: 0.03, arpEvery: 1, padVol: 0, bassWave: "square", bassVol: 0.06, bassSteps: [0, 4, 8, 12],
       hats: [2, 6, 10, 14], hatVol: 0.04, chime: false, cutoff: 4200, delay: 0 },
+    quest: { name: "Bakeshop Quest", desc: "Adventure march · 104 BPM", bpm: 104,
+      chords: [[57, 60, 64], [53, 57, 60], [60, 64, 67], [55, 59, 62]],
+      arpWave: "triangle", arpVol: 0.05, arpEvery: 2, padVol: 0.025, bassWave: "triangle", bassVol: 0.14, bassSteps: [0, 6, 8, 14],
+      hats: [4, 12], hatVol: 0.04, chime: false, cutoff: 3200, delay: 0.25 },
+    audit: { name: "Audit Mode", desc: "Focused pulse · 96 BPM", bpm: 96,
+      chords: [[62, 65, 69], [58, 62, 65], [53, 57, 60], [60, 64, 67]],
+      arpWave: "sine", arpVol: 0.05, arpEvery: 2, padVol: 0.03, bassWave: "sine", bassVol: 0.18, bassSteps: [0, 4, 8, 12],
+      hats: [2, 6, 10, 14], hatVol: 0.03, chime: false, cutoff: 2000, delay: 0.2 },
+    lounge: { name: "Faculty Lounge", desc: "Mellow jazz · 80 BPM", bpm: 80,
+      chords: [[62, 65, 69, 72], [55, 59, 62, 65], [60, 64, 67, 71], [57, 60, 64, 67]],
+      arpWave: "triangle", arpVol: 0.045, arpEvery: 2, padVol: 0.035, bassWave: "sine", bassVol: 0.18, bassSteps: [0, 8],
+      hats: [4, 12], hatVol: 0.035, chime: true, cutoff: 2200, delay: 0.3 },
+    board: { name: "Boardroom", desc: "Stately bells · 72 BPM", bpm: 72,
+      chords: [[60, 64, 67], [65, 69, 72], [57, 60, 64], [55, 59, 62]],
+      arpWave: "sine", arpVol: 0.05, arpEvery: 4, padVol: 0.04, bassWave: "sine", bassVol: 0.14, bassSteps: [0, 8],
+      hats: [], hatVol: 0, chime: true, cutoff: 2400, delay: 0.4 },
     calm: { name: "Quiet Study", desc: "Soft pads · 60 BPM", bpm: 60,
       chords: [[60, 64, 67, 72], [57, 60, 64, 69], [53, 57, 60, 65], [55, 59, 62, 67]],
       arpWave: "sine", arpVol: 0.045, arpEvery: 4, padVol: 0.045, bassWave: "sine", bassVol: 0.12, bassSteps: [0],
@@ -1373,7 +1406,7 @@
 
     const mf = (m) => 440 * Math.pow(2, (m - 69) / 12);
     const ARP = [0, 1, 2, 3, 2, 1, 2, 3];
-    let T = TRACKS.lofi, step = 0, next = 0, timer = null, vol = 0.45, token = 0;
+    let T = TRACKS.lofi, step = 0, next = 0, timer = null, vol = 0.45, token = 0, tempo = 1, swap = null;
     const configure = () => { tone.frequency.value = T.cutoff; delay.delayTime.value = T.delay || 0.01; wet.gain.value = T.delay ? 0.25 : 0; };
     configure();
 
@@ -1395,7 +1428,7 @@
       src.connect(hp).connect(g).connect(master); src.start(t);
     }
     function schedule(s, t) {
-      const len = 60 / T.bpm / 4;
+      const len = 60 / (T.bpm * tempo) / 4;
       const chord = T.chords[Math.floor(s / 16) % T.chords.length], L = chord.length, b = s % 16;
       if (b === 0 && T.padVol) chord.forEach((n) => voice(mf(n), t, len * 16, "sine", T.padVol, 0.35));
       if (T.bassSteps.includes(b)) voice(mf(chord[0] - 24), t, len * (T.bassSteps.length > 2 ? 3 : 6), T.bassWave, T.bassVol, 0.02);
@@ -1404,7 +1437,7 @@
       if (T.chime && b === 14 && Math.random() < 0.6) voice(mf(chord[(Math.random() * L) | 0] + 24), t, 0.6, "sine", 0.03);
     }
     function pump() {
-      while (next < ctx.currentTime + 0.15) { schedule(step, next); step++; next += 60 / T.bpm / 4; }
+      while (next < ctx.currentTime + 0.15) { schedule(step, next); step++; next += 60 / (T.bpm * tempo) / 4; }
     }
     function fadeTo(v, secs) {
       const t = ctx.currentTime;
@@ -1431,22 +1464,34 @@
         setTimeout(() => { if (my === token && timer) { clearInterval(timer); timer = null; } }, 900);
       },
       setVolume(v) { vol = v; if (timer) fadeTo(level(), 0.15); },
-      setTrack(name) { const nt = TRACKS[name] || TRACKS.lofi; if (nt === T) return; T = nt; configure(); step = 0; },
+      setTrack(name, smooth) {
+        const nt = TRACKS[name] || TRACKS.lofi;
+        if (nt === T && !swap) return;
+        clearTimeout(swap);
+        if (!smooth || !timer) { swap = null; T = nt; configure(); step = 0; return; }
+        // crossfade: dip out, switch on a fresh bar, swell back in
+        fadeTo(0.0001, 0.35);
+        swap = setTimeout(() => { swap = null; T = nt; configure(); step = 0; next = ctx.currentTime + 0.05; fadeTo(level(), 0.7); }, 380);
+      },
+      setTempo(m) { tempo = m; },
       pause() { if (ctx.state === "running") ctx.suspend(); },
       resume() { if (timer && ctx.state !== "running") ctx.resume(); }
     };
   }
 
   /* one shared music player for the loader + the whole site */
+  // which track fits each part of the site
+  const TRACK_FOR = { home: "lofi", rush: "chip", students: "quest", sidequest: "audit", hub: "calm", educators: "lounge", admins: "board" };
   const musicCtl = (() => {
-    let eng = null;
+    let eng = null, context = "home";
+    const trackId = () => TRACK_FOR[context] || "lofi";
     const listeners = new Set();
     const notify = () => listeners.forEach((fn) => fn());
     function apply() {
       if (!S.music) { if (eng) eng.stop(); setTimeout(notify, 950); notify(); return Promise.resolve(); }
       if (!eng) eng = createMusic();
       if (!eng) return Promise.resolve();
-      eng.setTrack(S.track);
+      eng.setTrack(trackId(), eng.running);
       eng.setVolume(S.musicVol / 100);
       return eng.start().then(notify);
     }
@@ -1461,6 +1506,14 @@
     return {
       apply,
       volume(v) { if (eng) eng.setVolume(v); },
+      setContext(c) {
+        if (c === context) return;
+        context = c;
+        if (eng && eng.running) eng.setTrack(trackId(), true);
+        notify();
+      },
+      tempo(m) { if (eng) eng.setTempo(m); },
+      get now() { return TRACKS[trackId()]; },
       get running() { return !!eng && eng.running && S.music; },
       onChange(fn) { listeners.add(fn); }
     };
@@ -1741,12 +1794,9 @@
         ${RANGE("sfxVol", "Sound effects volume", S.sfx, `<button type="button" class="set-mini" id="sfxTest" ${S.sfx ? "" : "disabled"}>Test</button>`)}
         ${SW("music", "Background music", "A looping soundtrack made right in your browser")}
         ${RANGE("musicVol", "Music volume", S.music)}
-        <div class="tracks ${S.music ? "" : "off"}" role="radiogroup" aria-label="Music track">
-          ${Object.entries(TRACKS).map(([id, t]) => `
-            <button type="button" class="track ${S.track === id ? "on" : ""}" role="radio" aria-checked="${S.track === id}" data-track="${id}" ${S.music ? "" : "disabled"}>
-              <span class="eq ${S.track === id && playing ? "playing" : ""}" aria-hidden="true"><i></i><i></i><i></i></span>
-              <span class="track-txt"><b>${esc(t.name)}</b><small>${esc(t.desc)}</small></span>
-            </button>`).join("")}
+        <div class="now-playing ${S.music ? "" : "off"}">
+          <span class="eq ${playing ? "playing" : ""}" aria-hidden="true"><i></i><i></i><i></i></span>
+          <span class="track-txt"><b>${S.music ? (playing ? "Now playing: " : "Up next: ") + esc(musicCtl.now.name) : "Music is off"}</b><small>The soundtrack changes to fit each part of the site, like an upbeat beat for Debit or Credit Rush.</small></span>
         </div>
         ${S.music && !playing ? '<p class="set-note">Music starts after your first tap or key press (browser rule).</p>' : ""}
       </section>
@@ -1792,15 +1842,10 @@
     });
     const test = $("#sfxTest", body);
     if (test) test.addEventListener("click", () => { fx.sound("level"); fx.burst(test, 14); });
-    $$(".track", body).forEach((t) => t.addEventListener("click", () => {
-      S.track = t.dataset.track; saveSettings();
-      musicCtl.apply().then(() => renderSettings("track:" + S.track));
-      renderSettings("track:" + S.track);
-    }));
     $("#setReset", body).addEventListener("click", () => { if (resetProgress()) $("#settingsDialog").close(); });
 
     if (focusKey) {
-      const el = focusKey.startsWith("track:") ? $(`[data-track="${focusKey.slice(6)}"]`, body) : $(`.switch[data-key="${focusKey}"]`, body);
+      const el = $(`.switch[data-key="${focusKey}"]`, body);
       if (el) el.focus({ preventScroll: true });
     }
   }

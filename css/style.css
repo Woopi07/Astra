@@ -1113,3 +1113,8 @@ html.no-motion [data-tilt]::after { display: none; }
   .pill-settings svg { width: 20px; height: 20px; }
   .pill-settings-txt { display: none; }
 }
+
+/* settings: now-playing strip (replaces the track picker) */
+.now-playing { display: flex; align-items: center; gap: 12px; padding: 12px; margin: 4px 0 6px; border-radius: 12px; background: var(--bg-2); border: 2px solid var(--line); }
+.now-playing.off { opacity: .5; }
+.now-playing .eq i { background: var(--yellow); }
