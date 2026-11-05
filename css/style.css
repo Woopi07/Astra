@@ -998,3 +998,27 @@ html.is-loading, html.is-loading body { overflow: hidden; }
 .inv-item.got:hover { background: var(--panel-2); }
 .inv-desc { margin: 0; padding: 0 14px 12px 64px; font-size: .86rem; color: var(--muted); animation: invDesc .3s ease; }
 @keyframes invDesc { from { opacity: 0; transform: translateY(-6px); } }
+
+/* ==========================================================
+   v6 — Resource hub on phones: no cut-off tabs / formula
+   ========================================================== */
+@media (max-width: 640px) {
+  .sheet { box-shadow: 5px 5px 0 var(--blue-deep); }
+  .fx-sheet code { white-space: normal; overflow-wrap: anywhere; line-height: 1.5; }
+  .fx-sheet { align-items: flex-start; }
+  .sheet-body { padding: 14px; min-height: 0; }
+  .sheet-card { padding: 14px; }
+  .sheet-card h3 { font-size: 1.25rem; }
+  .res-list { grid-template-columns: 1fr; }
+  .sheet-tabs {
+    display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); overflow: visible;
+    gap: 6px; padding: 8px;
+  }
+  .sheet-tab {
+    border: 2px solid var(--line); border-radius: 10px; padding: 10px 8px;
+    text-align: center; white-space: normal; line-height: 1.25;
+  }
+  .sheet-tab[aria-selected="true"] { border-color: var(--ink); box-shadow: 0 3px 0 var(--blue-deep); }
+  /* odd count: let the last tab span the full row */
+  .sheet-tab:last-child:nth-child(odd) { grid-column: 1 / -1; }
+}
