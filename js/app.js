@@ -1817,11 +1817,11 @@
       btn.setAttribute("aria-label", on ? "Close menu" : "Open menu");
     };
     btn.addEventListener("click", (e) => { e.stopPropagation(); setOpen(!nav.classList.contains("open")); fx.sound("click"); });
-    nav.addEventListener("click", (e) => { if (e.target.closest("a, #settingsBtn")) setOpen(false); });
+    nav.addEventListener("click", (e) => { if (e.target.closest("a, #settingsBtnMenu")) setOpen(false); });
     document.addEventListener("click", (e) => { if (nav.classList.contains("open") && !e.target.closest("#siteNav, #menuBtn")) setOpen(false); });
     document.addEventListener("keydown", (e) => { if (e.key === "Escape" && nav.classList.contains("open")) { setOpen(false); btn.focus(); } });
     window.addEventListener("hashchange", () => setOpen(false));
-    window.matchMedia("(min-width: 721px)").addEventListener("change", (m) => { if (m.matches) setOpen(false); });
+    window.matchMedia("(min-width: 981px)").addEventListener("change", (m) => { if (m.matches) setOpen(false); });
   }
 
   /* ==========================================================
@@ -1938,7 +1938,9 @@
   }
 
   musicCtl.onChange(() => { if ($("#settingsDialog").open) { const f = document.activeElement; renderSettings(); if (f && f.dataset && f.dataset.key) { const again = $(`[data-key="${f.dataset.key}"]`, $("#settingsBody")); if (again) again.focus({ preventScroll: true }); } } });
-  $("#settingsBtn").addEventListener("click", () => { renderSettings(); $("#settingsDialog").showModal(); fx.sound("click"); });
+  const openSettings = () => { renderSettings(); $("#settingsDialog").showModal(); fx.sound("click"); };
+  $("#settingsBtn").addEventListener("click", openSettings);
+  $("#settingsBtnMenu").addEventListener("click", openSettings);
   $("#settingsDialog").addEventListener("click", (e) => { if (e.target === e.currentTarget) e.currentTarget.close(); });
   if (!S.bg) $("#bgCanvas").style.display = "none";
 
