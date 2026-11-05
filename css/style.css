@@ -1029,15 +1029,6 @@ html.is-loading, html.is-loading body { overflow: hidden; }
   .topbar-left .menu-btn { order: -1; }
 }
 
-/* ---- loading-screen music button ---- */
-.loader-music {
-  z-index: 1; font-family: var(--font-mono); font-size: .78rem; font-weight: 700; cursor: pointer;
-  padding: 7px 14px; border-radius: 999px; background: var(--bg-2); color: var(--muted);
-  border: 2px solid var(--line); box-shadow: 0 3px 0 var(--line);
-}
-.loader-music.on { color: var(--ink); background: var(--mint); border-color: var(--ink); box-shadow: 0 3px 0 #23a383; animation: musicPulse 1.33s ease-in-out infinite; }
-@keyframes musicPulse { 50% { transform: scale(1.05); } }
-.loader.done .loader-music { transition: opacity .3s; opacity: 0; }
 
 /* ==========================================================
    v8 — Settings
@@ -1112,8 +1103,7 @@ html.is-loading, html.is-loading body { overflow: hidden; }
 
 /* "3D motion effects" off */
 html.no-motion .calc, html.no-motion .calc::before, html.no-motion .calc-screen::after,
-html.no-motion .rush-card.demo, html.no-motion .badge.got .badge-coin, html.no-motion .bpan.target,
-html.no-motion .loader-music.on { animation: none !important; }
+html.no-motion .rush-card.demo, html.no-motion .badge.got .badge-coin, html.no-motion .bpan.target { animation: none !important; }
 html.no-motion [data-tilt] { --rx: 0deg !important; --ry: 0deg !important; }
 html.no-motion [data-tilt]::after { display: none; }
 

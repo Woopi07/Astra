@@ -1333,24 +1333,8 @@
       requestAnimationFrame(tick);
     }
     requestAnimationFrame(tick);
-    /* ---- background music (keeps playing into the site) ---- */
-    const mBtn = $("#loadMusic");
-    const setBtn = () => {
-      if (!mBtn) return;
-      const on = musicCtl.running;
-      mBtn.textContent = on ? "♪ Music on · tap to mute" : (S.music ? "♪ Tap for music" : "♪ Music off · tap to play");
-      mBtn.setAttribute("aria-pressed", String(on));
-      mBtn.classList.toggle("on", on);
-    };
-    musicCtl.onChange(setBtn);
-    if (S.music) musicCtl.apply();            // plays right away if the browser allows autoplay
-    setTimeout(() => { if (mBtn && !finished) { mBtn.hidden = false; setBtn(); } }, 250);
-    if (mBtn) mBtn.addEventListener("click", (e) => {
-      e.stopPropagation(); // don't skip the loader
-      if (S.music && musicCtl.running) S.music = false;
-      else S.music = true;
-      saveSettings(); musicCtl.apply().then(setBtn); setBtn();
-    });
+    /* ---- background music: starts automatically (or on the first tap if the browser blocks autoplay) ---- */
+    if (S.music) musicCtl.apply();
 
     L.addEventListener("click", finish);
     document.addEventListener("keydown", (e) => { if (e.key === "Escape" || e.key === "Enter") finish(); }, { once: true });
@@ -1468,7 +1452,7 @@
     }
     // browsers block audio until the visitor interacts: start on the first tap/key if needed
     const kick = (e) => {
-      if (e.target && e.target.closest && e.target.closest("#loadMusic, #settingsDialog")) return;
+      if (e.target && e.target.closest && e.target.closest("#settingsDialog")) return;
       if (S.music && (!eng || !eng.running)) apply();
     };
     document.addEventListener("pointerdown", kick, { passive: true });
