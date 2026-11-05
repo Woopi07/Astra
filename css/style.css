@@ -426,7 +426,7 @@ html.is-loading, html.is-loading body { overflow: hidden; }
   background: radial-gradient(ellipse at 50% 35%, #1b2463 0%, #0a0f2e 65%);
   perspective: 700px; overflow: hidden; cursor: pointer;
   transition: opacity .6s ease .25s, visibility 0s linear .85s;
-  animation: loaderFailsafe .4s ease 7s forwards;
+  animation: loaderFailsafe .4s ease 10s forwards;
 }
 @keyframes loaderFailsafe { to { opacity: 0; visibility: hidden; } }
 .loader.done { opacity: 0; visibility: hidden; }
@@ -470,11 +470,6 @@ html.is-loading, html.is-loading body { overflow: hidden; }
 .cube-shadow { position: absolute; bottom: 0; width: 90px; height: 16px; border-radius: 50%; background: rgba(0,0,0,.45); filter: blur(6px); animation: shadowPulse 1.3s ease-in-out infinite alternate; }
 @keyframes shadowPulse { to { transform: scale(.75); opacity: .6; } }
 .loader-word { display: flex; gap: 6px; font-family: var(--font-display); font-weight: 800; font-size: clamp(2.2rem, 9vw, 3.4rem); letter-spacing: .08em; perspective: 400px; z-index: 1; }
-.loader-word span { display: inline-block; color: var(--text); text-shadow: 0 4px 0 var(--blue-deep), 0 8px 18px rgba(0,0,0,.4); animation: letterIn .7s cubic-bezier(.3,1.5,.5,1) both; }
-.loader-word span:nth-child(2) { animation-delay: .08s; }
-.loader-word span:nth-child(3) { animation-delay: .16s; color: var(--yellow); }
-.loader-word span:nth-child(4) { animation-delay: .24s; }
-.loader-word span:nth-child(5) { animation-delay: .32s; }
 @keyframes letterIn { from { opacity: 0; transform: rotateX(-90deg) translateY(20px); } }
 .loader-lcd {
   z-index: 1; display: flex; justify-content: space-between; gap: 18px; min-width: min(300px, 82vw);
@@ -1028,3 +1023,51 @@ html.is-loading, html.is-loading body { overflow: hidden; }
 @media (max-width: 720px) {
   .topbar-left .menu-btn { order: -1; }
 }
+
+/* ==========================================================
+   v7 — interactive loader letters
+   ========================================================== */
+.loader-word { gap: clamp(4px, 1.5vw, 10px); perspective: 500px; }
+.loader-word .lw {
+  display: inline-block; cursor: pointer; perspective: 400px;
+  transform: translateZ(var(--z, 0)) rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg)) scale(var(--s, 1));
+  transition: transform .18s ease-out;
+  animation: letterIn .7s cubic-bezier(.3,1.5,.5,1) backwards;
+  text-shadow: none;
+}
+.loader-word .lw:nth-child(2) { animation-delay: .08s; }
+.loader-word .lw:nth-child(3) { animation-delay: .16s; }
+.loader-word .lw:nth-child(4) { animation-delay: .24s; }
+.loader-word .lw:nth-child(5) { animation-delay: .32s; }
+.lw-in {
+  position: relative; display: inline-block; transform-style: preserve-3d;
+  transition: transform .55s cubic-bezier(.3,1.5,.5,1);
+  animation: lwWave 2.4s ease-in-out infinite;
+}
+.lw:nth-child(1) .lw-in { animation-delay: .9s; }
+.lw:nth-child(2) .lw-in { animation-delay: 1.05s; }
+.lw:nth-child(3) .lw-in { animation-delay: 1.2s; }
+.lw:nth-child(4) .lw-in { animation-delay: 1.35s; }
+.lw:nth-child(5) .lw-in { animation-delay: 1.5s; }
+@keyframes lwWave { 0%, 60%, 100% { translate: 0 0; } 30% { translate: 0 -10px; } }
+.lw-f, .lw-b {
+  font-weight: 800; backface-visibility: hidden; -webkit-backface-visibility: hidden;
+  text-shadow: 0 4px 0 var(--blue-deep), 0 8px 18px rgba(0,0,0,.4);
+}
+.lw-f { display: inline-block; color: var(--text); }
+.lw:nth-child(3) .lw-f { color: var(--yellow); }
+.lw-b {
+  position: absolute; left: -4%; right: -4%; top: 8%; bottom: 8%;
+  display: grid; place-items: center; font-family: var(--font-mono); font-size: .8em; letter-spacing: 0;
+  transform: rotateX(180deg); color: var(--ink);
+  background: var(--yellow); border-radius: 12px; text-shadow: none; box-shadow: 0 5px 0 #c99a00;
+}
+.lw:nth-child(2) .lw-b { background: var(--coral); box-shadow: 0 5px 0 #c9584a; }
+.lw:nth-child(3) .lw-b { background: var(--mint); box-shadow: 0 5px 0 #23a383; }
+.lw:nth-child(4) .lw-b { background: var(--blue); box-shadow: 0 5px 0 var(--blue-deep); }
+.lw.lw-flip .lw-in { transform: rotateX(180deg); }
+.lw.in { animation: none; }
+.lw.pop .lw-in { animation: none; }
+.lw:hover .lw-f { color: var(--yellow); }
+.lw:nth-child(3):hover .lw-f { color: var(--mint); }
+.loader-hint { cursor: default; }

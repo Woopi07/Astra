@@ -124,7 +124,19 @@
         ], { duration: 1000 + Math.random() * 700, easing: "cubic-bezier(.2,.7,.4,1)" }).onfinish = () => el.remove();
       }
     }
-    return { sound, burst };
+    function note(freq) {
+      if (!state.sound) return;
+      try {
+        ctx = ctx || new (window.AudioContext || window.webkitAudioContext)();
+        const o = ctx.createOscillator(), g = ctx.createGain(), t0 = ctx.currentTime;
+        o.type = "triangle"; o.frequency.value = freq;
+        g.gain.setValueAtTime(0.0001, t0);
+        g.gain.exponentialRampToValueAtTime(0.14, t0 + 0.01);
+        g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.35);
+        o.connect(g).connect(ctx.destination); o.start(t0); o.stop(t0 + 0.4);
+      } catch (e) { /* audio unavailable */ }
+    }
+    return { sound, burst, note };
   })();
   const good = (el, n) => { fx.sound("ok"); fx.burst(el, n || 18); };
   const bad = (el) => {
@@ -1299,7 +1311,7 @@
     const msgs = ["Opening the books…", "Posting journal entries…", "Balancing the ledger…", "Reconciling accounts…", "Closing the period…", "Ready!"];
     const minTime = reduceMotion ? 300 : 2000;
     const start = performance.now();
-    let loaded = document.readyState === "complete", finished = false;
+    let loaded = document.readyState === "complete", finished = false, allFound = false;
     window.addEventListener("load", () => { loaded = true; });
     const pctEl = $("#loadPct"), bar = $("#loadBar"), msg = $("#loadMsg");
     document.documentElement.classList.add("is-loading");
@@ -1317,14 +1329,64 @@
       const shown = Math.floor((loaded ? t : Math.min(t, 0.9)) * 100);
       pctEl.textContent = String(shown).padStart(3, "0") + "%";
       bar.style.width = shown + "%";
-      msg.textContent = msgs[Math.min(msgs.length - 2, Math.floor(shown / 20))];
-      if (t >= 1 && loaded) { setTimeout(finish, 250); return; }
+      if (!allFound) msg.textContent = msgs[Math.min(msgs.length - 2, Math.floor(shown / 20))];
+      // wait while the visitor is playing with the letters (up to the safety net)
+      if (t >= 1 && loaded && !(playing() && now - start < 8000)) { setTimeout(finish, 250); return; }
       requestAnimationFrame(tick);
     }
+    /* ---- interactive A-S-T-R-A ---- */
+    const word = $("#loaderWord");
+    const letters = word ? $$(".lw", word) : [];
+    const NOTES = [523.25, 587.33, 659.25, 783.99, 1046.5]; // C D E G C
+    const flipped = new Set();
+    let lastPlay = 0, pointerIn = false;
+    const playing = () => pointerIn || performance.now() - lastPlay < 1500;
+    // the entrance animation should only ever play once
+    setTimeout(() => letters.forEach((el) => el.classList.add("in")), 1100);
+
+    function flip(el, auto) {
+      const i = Number(el.dataset.i);
+      if (el.classList.contains("lw-flip")) return;
+      el.classList.add("lw-flip", "pop");
+      flipped.add(i);
+      if (!auto) { lastPlay = performance.now(); fx.note(NOTES[i]); fx.burst(el, 8); }
+      if (flipped.size === letters.length && !auto) {
+        allFound = true;
+        msg.textContent = "+ − × ÷ = all found!";
+        $("#loadHint").textContent = "You found every operator ✦";
+        if (!auto) { fx.burst(word, 30); fx.sound("level"); }
+      }
+      setTimeout(() => el.classList.remove("pop"), 450);
+      setTimeout(() => { el.classList.remove("lw-flip"); flipped.delete(i); }, auto ? 700 : 1600);
+    }
+    letters.forEach((el) => {
+      el.addEventListener("pointerenter", (e) => { if (e.pointerType === "mouse") flip(el); });
+      el.addEventListener("click", (e) => { e.stopPropagation(); flip(el); });
+    });
+    if (word && !reduceMotion) {
+      // letters lean toward the pointer and swell when it's close (like a dock)
+      L.addEventListener("pointermove", (e) => {
+        const wr = word.getBoundingClientRect();
+        pointerIn = e.clientY > wr.top - 60 && e.clientY < wr.bottom + 60 && e.clientX > wr.left - 60 && e.clientX < wr.right + 60;
+        letters.forEach((el) => {
+          const r = el.getBoundingClientRect();
+          const dx = e.clientX - (r.left + r.width / 2), dy = e.clientY - (r.top + r.height / 2);
+          const d = Math.hypot(dx, dy), near = Math.max(0, 1 - d / 220);
+          el.style.setProperty("--ry", (Math.max(-1, Math.min(1, dx / 200)) * 25 * near).toFixed(1) + "deg");
+          el.style.setProperty("--rx", (Math.max(-1, Math.min(1, -dy / 200)) * 25 * near).toFixed(1) + "deg");
+          el.style.setProperty("--s", (1 + near * 0.35).toFixed(3));
+          el.style.setProperty("--z", (near * 40).toFixed(0) + "px");
+        });
+      });
+      L.addEventListener("pointerleave", () => { pointerIn = false; letters.forEach((el) => { el.style.setProperty("--s", 1); el.style.setProperty("--rx", "0deg"); el.style.setProperty("--ry", "0deg"); el.style.setProperty("--z", "0px"); }); });
+      // a little self-play so first-time visitors see the letters can flip
+      letters.forEach((el, k) => setTimeout(() => { if (!finished && !pointerIn) flip(el, true); }, 900 + k * 120));
+    }
+
     requestAnimationFrame(tick);
     L.addEventListener("click", finish);
     document.addEventListener("keydown", (e) => { if (e.key === "Escape" || e.key === "Enter") finish(); }, { once: true });
-    setTimeout(finish, 6000); // safety net
+    setTimeout(finish, 9000); // safety net
   }
 
   /* ==========================================================
