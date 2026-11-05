@@ -26,6 +26,13 @@
     if (!badgeCheckQueued) { badgeCheckQueued = true; setTimeout(() => { badgeCheckQueued = false; checkBadges(); }, 0); }
   };
 
+  /* ---------------- Settings (saved separately from progress) ---------------- */
+  const SKEY = "astra-settings-v1";
+  let S = { sfx: !!state.sound, sfxVol: 70, music: state.loaderMusic !== false, musicVol: 45, track: "lofi", bg: true, motion: true, confetti: true, loader: true };
+  try { const raw = localStorage.getItem(SKEY); if (raw) Object.assign(S, JSON.parse(raw)); } catch (e) { /* defaults */ }
+  const saveSettings = () => { try { localStorage.setItem(SKEY, JSON.stringify(S)); } catch (e) { /* ignore */ } };
+  document.documentElement.classList.toggle("no-motion", !S.motion);
+
   const rankFor = (xp) => RANKS.reduce((r, k) => (xp >= k.min ? k : r), RANKS[0]);
 
   function renderXP(bump) {
@@ -83,16 +90,18 @@
       badge: [[784, 0], [1175, 0.12]]
     };
     function sound(name) {
-      if (!state.sound) return;
+      if (!S.sfx) return;
+      const peak = Math.max(0.0002, 0.16 * (S.sfxVol / 100));
       try {
         ctx = ctx || new (window.AudioContext || window.webkitAudioContext)();
+        if (ctx.state === "suspended") ctx.resume();
         (tones[name] || tones.click).forEach(([f, at]) => {
           const o = ctx.createOscillator(), g = ctx.createGain();
           o.type = name === "bad" ? "sawtooth" : "triangle";
           o.frequency.value = f;
           const t0 = ctx.currentTime + at;
           g.gain.setValueAtTime(0.0001, t0);
-          g.gain.exponentialRampToValueAtTime(0.12, t0 + 0.01);
+          g.gain.exponentialRampToValueAtTime(peak, t0 + 0.01);
           g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.18);
           o.connect(g).connect(ctx.destination);
           o.start(t0); o.stop(t0 + 0.2);
@@ -102,7 +111,7 @@
     const COLORS = ["#ffd23f", "#7b8cff", "#ff8a75", "#46d6b0", "#eef1ff"];
     const GLYPHS = ["+", "−", "×", "÷", "₱", "★"];
     function burst(origin, n = 26) {
-      if (reduceMotion) return;
+      if (reduceMotion || !S.confetti) return;
       let x = window.innerWidth / 2, y = window.innerHeight / 3;
       if (origin && origin.getBoundingClientRect) {
         const r = origin.getBoundingClientRect();
@@ -1274,6 +1283,7 @@
     let cur = null;
     const reset = (el) => { el.style.setProperty("--rx", "0deg"); el.style.setProperty("--ry", "0deg"); el.classList.remove("tilting"); };
     document.addEventListener("pointermove", (e) => {
+      if (!S.motion) { if (cur) reset(cur); cur = null; return; }
       const el = e.target.closest && e.target.closest("[data-tilt]");
       if (cur && cur !== el) reset(cur);
       cur = el;
@@ -1296,6 +1306,7 @@
   function initLoader() {
     const L = $("#loader");
     if (!L) return;
+    if (!S.loader) { L.remove(); if (S.music) musicCtl.apply(); return; }
     const msgs = ["Opening the books…", "Posting journal entries…", "Balancing the ledger…", "Reconciling accounts…", "Closing the period…", "Ready!"];
     const minTime = reduceMotion ? 300 : 2000;
     const start = performance.now();
@@ -1308,7 +1319,6 @@
       finished = true;
       pctEl.textContent = "100%"; bar.style.width = "100%"; msg.textContent = msgs[msgs.length - 1];
       L.classList.add("done");
-      if (music) music.fadeOut();
       document.documentElement.classList.remove("is-loading");
       setTimeout(() => L.remove(), reduceMotion ? 50 : 900);
     }
@@ -1323,28 +1333,23 @@
       requestAnimationFrame(tick);
     }
     requestAnimationFrame(tick);
-    /* ---- background music for the loading screen ---- */
-    const music = state.loaderMusic === false ? null : createLoaderMusic();
+    /* ---- background music (keeps playing into the site) ---- */
     const mBtn = $("#loadMusic");
     const setBtn = () => {
       if (!mBtn) return;
-      const on = music && music.running && !music.muted;
-      mBtn.textContent = on ? "♪ Music on · tap to mute" : (music && music.running ? "♪ Music muted · tap to play" : "♪ Tap for music");
-      mBtn.setAttribute("aria-pressed", String(!!on));
-      mBtn.classList.toggle("on", !!on);
+      const on = musicCtl.running;
+      mBtn.textContent = on ? "♪ Music on · tap to mute" : (S.music ? "♪ Tap for music" : "♪ Music off · tap to play");
+      mBtn.setAttribute("aria-pressed", String(on));
+      mBtn.classList.toggle("on", on);
     };
-    if (music) {
-      music.start().then(setBtn);           // works if the browser allows autoplay
-      setTimeout(() => { if (mBtn && !finished) { mBtn.hidden = false; setBtn(); } }, 250);
-    } else if (mBtn) {
-      mBtn.hidden = false; mBtn.textContent = "♪ Music off · tap to play";
-    }
+    musicCtl.onChange(setBtn);
+    if (S.music) musicCtl.apply();            // plays right away if the browser allows autoplay
+    setTimeout(() => { if (mBtn && !finished) { mBtn.hidden = false; setBtn(); } }, 250);
     if (mBtn) mBtn.addEventListener("click", (e) => {
       e.stopPropagation(); // don't skip the loader
-      if (!music) { state.loaderMusic = true; persist(); mBtn.textContent = "♪ Music on next visit"; return; }
-      if (!music.running) { music.start().then(setBtn); state.loaderMusic = true; }
-      else { music.setMuted(!music.muted); state.loaderMusic = !music.muted; setBtn(); }
-      persist();
+      if (S.music && musicCtl.running) S.music = false;
+      else S.music = true;
+      saveSettings(); musicCtl.apply().then(setBtn); setBtn();
     });
 
     L.addEventListener("click", finish);
@@ -1354,56 +1359,68 @@
 
 
   /* ==========================================================
-     LOADING-SCREEN MUSIC (generated live with Web Audio, no files)
-     Soft lo-fi loop: Cmaj7 - Am7 - Fmaj7 - G7 at 90 BPM
+     BACKGROUND MUSIC (generated live with Web Audio, no audio files)
      ========================================================== */
-  function createLoaderMusic() {
+  const TRACKS = {
+    lofi: { name: "Ledger Lo-fi", desc: "Chill beats · 90 BPM", bpm: 90,
+      chords: [[60, 64, 67, 71], [57, 60, 64, 67], [53, 57, 60, 64], [55, 59, 62, 65]],
+      arpWave: "triangle", arpVol: 0.06, arpEvery: 2, padVol: 0.03, bassWave: "sine", bassVol: 0.2, bassSteps: [0, 10],
+      hats: [2, 6, 10, 14], hatVol: 0.05, chime: true, cutoff: 2600, delay: 0.33 },
+    chip: { name: "Balance Sheet Bounce", desc: "Upbeat chiptune · 128 BPM", bpm: 128,
+      chords: [[60, 64, 67], [55, 59, 62], [57, 60, 64], [53, 57, 60]],
+      arpWave: "square", arpVol: 0.03, arpEvery: 1, padVol: 0, bassWave: "square", bassVol: 0.06, bassSteps: [0, 4, 8, 12],
+      hats: [2, 6, 10, 14], hatVol: 0.04, chime: false, cutoff: 4200, delay: 0 },
+    calm: { name: "Quiet Study", desc: "Soft pads · 60 BPM", bpm: 60,
+      chords: [[60, 64, 67, 72], [57, 60, 64, 69], [53, 57, 60, 65], [55, 59, 62, 67]],
+      arpWave: "sine", arpVol: 0.045, arpEvery: 4, padVol: 0.045, bassWave: "sine", bassVol: 0.12, bassSteps: [0],
+      hats: [], hatVol: 0, chime: true, cutoff: 1800, delay: 0.45 }
+  };
+
+  function createMusic() {
     const AC = window.AudioContext || window.webkitAudioContext;
     if (!AC) return null;
     let ctx;
     try { ctx = new AC(); } catch (e) { return null; }
     const master = ctx.createGain(); master.gain.value = 0.0001;
-    const tone = ctx.createBiquadFilter(); tone.type = "lowpass"; tone.frequency.value = 2600;
-    const delay = ctx.createDelay(); delay.delayTime.value = 0.33;
-    const fb = ctx.createGain(); fb.gain.value = 0.28;
-    const wet = ctx.createGain(); wet.gain.value = 0.25;
+    const tone = ctx.createBiquadFilter(); tone.type = "lowpass";
+    const delay = ctx.createDelay(1); const fb = ctx.createGain(); fb.gain.value = 0.28; const wet = ctx.createGain();
     tone.connect(master); tone.connect(delay); delay.connect(fb).connect(delay); delay.connect(wet).connect(master);
     master.connect(ctx.destination);
 
     const mf = (m) => 440 * Math.pow(2, (m - 69) / 12);
-    const CHORDS = [[60, 64, 67, 71], [57, 60, 64, 67], [53, 57, 60, 64], [55, 59, 62, 65]];
     const ARP = [0, 1, 2, 3, 2, 1, 2, 3];
-    const STEP = 60 / 90 / 4; // sixteenth notes
-    let step = 0, next = 0, timer = null, muted = false;
+    let T = TRACKS.lofi, step = 0, next = 0, timer = null, vol = 0.45, token = 0;
+    const configure = () => { tone.frequency.value = T.cutoff; delay.delayTime.value = T.delay || 0.01; wet.gain.value = T.delay ? 0.25 : 0; };
+    configure();
 
     const noise = ctx.createBuffer(1, Math.floor(ctx.sampleRate * 0.05), ctx.sampleRate);
     const nd = noise.getChannelData(0);
     for (let i = 0; i < nd.length; i++) nd[i] = (Math.random() * 2 - 1) * (1 - i / nd.length);
 
-    function voice(freq, t, dur, type, vol, attack) {
+    function voice(freq, t, dur, type, v, attack) {
       const o = ctx.createOscillator(), g = ctx.createGain();
       o.type = type; o.frequency.value = freq;
       g.gain.setValueAtTime(0.0001, t);
-      g.gain.exponentialRampToValueAtTime(vol, t + (attack || 0.01));
+      g.gain.exponentialRampToValueAtTime(v, t + (attack || 0.01));
       g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
       o.connect(g).connect(tone); o.start(t); o.stop(t + dur + 0.05);
     }
-    function hat(t) {
+    function hat(t, v) {
       const src = ctx.createBufferSource(), hp = ctx.createBiquadFilter(), g = ctx.createGain();
-      src.buffer = noise; hp.type = "highpass"; hp.frequency.value = 7000; g.gain.value = 0.05;
+      src.buffer = noise; hp.type = "highpass"; hp.frequency.value = 7000; g.gain.value = v;
       src.connect(hp).connect(g).connect(master); src.start(t);
     }
     function schedule(s, t) {
-      const chord = CHORDS[Math.floor(s / 16) % CHORDS.length];
-      const b = s % 16;
-      if (b === 0) chord.forEach((n) => voice(mf(n), t, STEP * 16, "sine", 0.03, 0.35));           // pad
-      if (b === 0 || b === 10) voice(mf(chord[0] - 24), t, STEP * 6, "sine", 0.2, 0.02);          // bass
-      if (b % 2 === 0) voice(mf(chord[ARP[b / 2]] + 12), t, 0.32, "triangle", 0.06);              // arp
-      if (b % 4 === 2) hat(t);                                                                   // hats
-      if (b === 14 && Math.random() < 0.6) voice(mf(chord[(Math.random() * 4) | 0] + 24), t, 0.6, "sine", 0.03); // chime
+      const len = 60 / T.bpm / 4;
+      const chord = T.chords[Math.floor(s / 16) % T.chords.length], L = chord.length, b = s % 16;
+      if (b === 0 && T.padVol) chord.forEach((n) => voice(mf(n), t, len * 16, "sine", T.padVol, 0.35));
+      if (T.bassSteps.includes(b)) voice(mf(chord[0] - 24), t, len * (T.bassSteps.length > 2 ? 3 : 6), T.bassWave, T.bassVol, 0.02);
+      if (b % T.arpEvery === 0) voice(mf(chord[ARP[(b / T.arpEvery) % 8] % L] + 12), t, Math.min(0.32, len * T.arpEvery * 1.6), T.arpWave, T.arpVol);
+      if (T.hats.includes(b)) hat(t, T.hatVol);
+      if (T.chime && b === 14 && Math.random() < 0.6) voice(mf(chord[(Math.random() * L) | 0] + 24), t, 0.6, "sine", 0.03);
     }
     function pump() {
-      while (next < ctx.currentTime + 0.15) { schedule(step, next); step++; next += STEP; }
+      while (next < ctx.currentTime + 0.15) { schedule(step, next); step++; next += 60 / T.bpm / 4; }
     }
     function fadeTo(v, secs) {
       const t = ctx.currentTime;
@@ -1411,34 +1428,66 @@
       master.gain.setValueAtTime(Math.max(master.gain.value, 0.0001), t);
       master.gain.exponentialRampToValueAtTime(Math.max(v, 0.0001), t + secs);
     }
+    const level = () => Math.max(0.0001, vol * 0.7);
     return {
-      get running() { return ctx.state === "running"; },
-      get muted() { return muted; },
+      get running() { return ctx.state === "running" && !!timer; },
       start() {
+        token++;
         const go = () => {
-          if (timer) return;
-          next = ctx.currentTime + 0.05;
-          timer = setInterval(pump, 25); pump();
-          fadeTo(muted ? 0.0001 : 0.5, 1.2);
+          if (!timer) { next = ctx.currentTime + 0.05; timer = setInterval(pump, 25); pump(); }
+          fadeTo(level(), 1.2);
         };
-        if (ctx.state === "suspended") return ctx.resume().then(go, () => {});
+        if (ctx.state !== "running") return ctx.resume().then(go, () => {});
         go(); return Promise.resolve();
       },
-      setMuted(m) { muted = m; if (timer) fadeTo(m ? 0.0001 : 0.5, 0.4); },
-      fadeOut() {
-        if (!timer) { try { ctx.close(); } catch (e) {} return; }
-        fadeTo(0.0001, 1.6);
-        setTimeout(() => { clearInterval(timer); timer = null; try { ctx.close(); } catch (e) {} }, 1800);
-      }
+      stop() {
+        if (!timer) return;
+        const my = ++token;
+        fadeTo(0.0001, 0.8);
+        setTimeout(() => { if (my === token && timer) { clearInterval(timer); timer = null; } }, 900);
+      },
+      setVolume(v) { vol = v; if (timer) fadeTo(level(), 0.15); },
+      setTrack(name) { const nt = TRACKS[name] || TRACKS.lofi; if (nt === T) return; T = nt; configure(); step = 0; },
+      pause() { if (ctx.state === "running") ctx.suspend(); },
+      resume() { if (timer && ctx.state !== "running") ctx.resume(); }
     };
   }
+
+  /* one shared music player for the loader + the whole site */
+  const musicCtl = (() => {
+    let eng = null;
+    const listeners = new Set();
+    const notify = () => listeners.forEach((fn) => fn());
+    function apply() {
+      if (!S.music) { if (eng) eng.stop(); setTimeout(notify, 950); notify(); return Promise.resolve(); }
+      if (!eng) eng = createMusic();
+      if (!eng) return Promise.resolve();
+      eng.setTrack(S.track);
+      eng.setVolume(S.musicVol / 100);
+      return eng.start().then(notify);
+    }
+    // browsers block audio until the visitor interacts: start on the first tap/key if needed
+    const kick = (e) => {
+      if (e.target && e.target.closest && e.target.closest("#loadMusic, #settingsDialog")) return;
+      if (S.music && (!eng || !eng.running)) apply();
+    };
+    document.addEventListener("pointerdown", kick, { passive: true });
+    document.addEventListener("keydown", kick);
+    document.addEventListener("visibilitychange", () => { if (!eng) return; if (document.hidden) eng.pause(); else if (S.music) eng.resume(); });
+    return {
+      apply,
+      volume(v) { if (eng) eng.setVolume(v); },
+      get running() { return !!eng && eng.running && S.music; },
+      onChange(fn) { listeners.add(fn); }
+    };
+  })();
 
   /* ==========================================================
      KEYBOARD SHORTCUTS
      ========================================================== */
   function initKeys() {
     document.addEventListener("keydown", (e) => {
-      if (e.ctrlKey || e.metaKey || e.altKey || $("#loader:not(.done)") || $("#badgeDialog").open || $("#detailDialog").open) return;
+      if (e.ctrlKey || e.metaKey || e.altKey || $("#loader:not(.done)") || $("#badgeDialog").open || $("#detailDialog").open || $("#settingsDialog").open) return;
       const tag = (e.target.tagName || "").toLowerCase();
       if (tag === "input" || tag === "textarea" || tag === "select") return;
       const view = ($(".view:not([hidden])") || {}).dataset?.view;
@@ -1463,15 +1512,8 @@
   }
 
   /* ==========================================================
-     HUD: sound toggle + badges dialog
+     HUD: badges dialog
      ========================================================== */
-  function renderSoundBtn() {
-    const b = $("#soundBtn");
-    b.setAttribute("aria-pressed", String(!!state.sound));
-    b.classList.toggle("on", !!state.sound);
-    b.title = state.sound ? "Sound on (click to mute)" : "Sound off (click to unmute)";
-  }
-  $("#soundBtn").addEventListener("click", () => { state.sound = !state.sound; persist(); renderSoundBtn(); fx.sound("click"); });
   $("#lcdBtn").addEventListener("click", () => { renderBadges(); $("#badgeDialog").showModal(); });
   $("#badgeClose").addEventListener("click", () => $("#badgeDialog").close());
   $("#badgeDialog").addEventListener("keydown", (e) => { if (e.key === "Escape") { e.preventDefault(); $("#badgeDialog").close(); } });
@@ -1485,6 +1527,7 @@
        get pushed away by the cursor and linked to it like stars
      - click/tap on empty space sends out a ripple
      ========================================================== */
+  let wakeBackground = () => {};
   function initBackground() {
     const cv = $("#bgCanvas");
     if (!cv || !cv.getContext) return;
@@ -1494,7 +1537,8 @@
     const CELL = 32;
     let W = 0, H = 0, dpr = 1, parts = [], ripples = [];
     const mouse = { x: -9999, y: -9999, active: false };
-    let running = true;
+    let running = true, sleeping = false;
+    wakeBackground = () => { if (sleeping && S.bg && !reduceMotion) { sleeping = false; requestAnimationFrame(frame); } };
 
     function resize() {
       dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -1519,6 +1563,7 @@
     let lastScroll = window.scrollY;
     function frame() {
       if (!running) return;
+      if (!S.bg) { ctx.clearRect(0, 0, W, H); sleeping = true; return; }
       ctx.clearRect(0, 0, W, H);
       const sy = window.scrollY, dScroll = sy - lastScroll; lastScroll = sy;
 
@@ -1626,6 +1671,7 @@
     window.addEventListener("blur", () => { mouse.active = false; });
     const INTERACTIVE = "a,button,input,select,textarea,label,summary,dialog,.panel,.flip,.calc,.sheet,.card,.inventory,.sq-card,.weight,.topbar,.loader";
     window.addEventListener("pointerdown", (e) => {
+      if (!S.bg) return;
       if (e.target.closest && e.target.closest(INTERACTIVE)) return;
       ripples.push({ x: e.clientX, y: e.clientY, r: 4, max: Math.max(W, H) * 0.45 });
       for (let i = 0; i < 4; i++) {
@@ -1655,7 +1701,7 @@
       btn.setAttribute("aria-label", on ? "Close menu" : "Open menu");
     };
     btn.addEventListener("click", (e) => { e.stopPropagation(); setOpen(!nav.classList.contains("open")); fx.sound("click"); });
-    nav.addEventListener("click", (e) => { if (e.target.closest("a")) setOpen(false); });
+    nav.addEventListener("click", (e) => { if (e.target.closest("a, #settingsBtn")) setOpen(false); });
     document.addEventListener("click", (e) => { if (nav.classList.contains("open") && !e.target.closest("#siteNav, #menuBtn")) setOpen(false); });
     document.addEventListener("keydown", (e) => { if (e.key === "Escape" && nav.classList.contains("open")) { setOpen(false); btn.focus(); } });
     window.addEventListener("hashchange", () => setOpen(false));
@@ -1673,13 +1719,120 @@
     setInterval(() => {
       if (document.hidden) return;
       const calc = $(".calc");
-      if (!calc || calc.offsetParent === null || calc.classList.contains("tilting")) return;
+      if (!S.motion || !calc || calc.offsetParent === null || calc.classList.contains("tilting")) return;
       let i; do { i = (Math.random() * keys.length) | 0; } while (i === last && keys.length > 1);
       last = i;
       keys[i].classList.add("pressed");
       setTimeout(() => keys[i].classList.remove("pressed"), 220);
     }, 1400);
   }
+
+
+  /* ==========================================================
+     SETTINGS PANEL
+     ========================================================== */
+  const SW = (key, title, desc) => `
+    <div class="set-row">
+      <div class="set-txt"><b id="lbl-${key}">${title}</b><small>${desc}</small></div>
+      <button type="button" class="switch" role="switch" aria-checked="${!!S[key]}" aria-labelledby="lbl-${key}" data-key="${key}"><span class="knob"></span></button>
+    </div>`;
+  const RANGE = (key, label, enabled, extra) => `
+    <div class="set-row set-range ${enabled ? "" : "off"}">
+      <span class="set-vol-ic" aria-hidden="true">${key === "musicVol" ? "♪" : "◖"}</span>
+      <input type="range" min="0" max="100" step="5" value="${S[key]}" data-key="${key}" aria-label="${label}" ${enabled ? "" : "disabled"} style="--p:${S[key]}%" />
+      <output data-out="${key}">${S[key]}%</output>${extra || ""}
+    </div>`;
+
+  function renderSettings(focusKey) {
+    const playing = musicCtl.running;
+    $("#settingsBody").innerHTML = `
+      <div class="badges-head">
+        <div><p class="eyebrow">Make it yours</p><h2 id="setTitle">Settings</h2></div>
+        <button type="button" class="hud-btn" id="setClose" aria-label="Close settings">✕</button>
+      </div>
+
+      <section class="set-sec">
+        <h3>Sound</h3>
+        ${SW("sfx", "Sound effects", "Clicks, right/wrong tones, rank-ups and badges")}
+        ${RANGE("sfxVol", "Sound effects volume", S.sfx, `<button type="button" class="set-mini" id="sfxTest" ${S.sfx ? "" : "disabled"}>Test</button>`)}
+        ${SW("music", "Background music", "A looping soundtrack made right in your browser")}
+        ${RANGE("musicVol", "Music volume", S.music)}
+        <div class="tracks ${S.music ? "" : "off"}" role="radiogroup" aria-label="Music track">
+          ${Object.entries(TRACKS).map(([id, t]) => `
+            <button type="button" class="track ${S.track === id ? "on" : ""}" role="radio" aria-checked="${S.track === id}" data-track="${id}" ${S.music ? "" : "disabled"}>
+              <span class="eq ${S.track === id && playing ? "playing" : ""}" aria-hidden="true"><i></i><i></i><i></i></span>
+              <span class="track-txt"><b>${esc(t.name)}</b><small>${esc(t.desc)}</small></span>
+            </button>`).join("")}
+        </div>
+        ${S.music && !playing ? '<p class="set-note">Music starts after your first tap or key press (browser rule).</p>' : ""}
+      </section>
+
+      <section class="set-sec">
+        <h3>Visuals</h3>
+        ${SW("bg", "Animated background", "Floating symbols, cursor glow and click ripples")}
+        ${SW("motion", "3D motion effects", "Card tilt, the swaying calculator and idle animations")}
+        ${SW("confetti", "Confetti", "Celebration bursts for correct answers and badges")}
+      </section>
+
+      <section class="set-sec">
+        <h3>Startup</h3>
+        ${SW("loader", "Loading screen", "Show the 3D loading screen when the site opens")}
+      </section>
+
+      <section class="set-sec">
+        <h3>Progress</h3>
+        <div class="set-row">
+          <div class="set-txt"><b>Reset my progress</b><small>Clears XP, habits, badges, plans and scores on this device. Settings stay.</small></div>
+          <button type="button" class="set-danger" id="setReset">Reset</button>
+        </div>
+      </section>
+      ${reduceMotion ? '<p class="set-note">Your device asks for reduced motion, so some animations stay off.</p>' : ""}`;
+
+    const body = $("#settingsBody");
+    $("#setClose", body).addEventListener("click", () => $("#settingsDialog").close());
+    $$(".switch", body).forEach((sw) => sw.addEventListener("click", () => {
+      const k = sw.dataset.key;
+      S[k] = !S[k]; saveSettings();
+      applySetting(k, sw);
+      renderSettings(k);
+    }));
+    $$('input[type="range"]', body).forEach((r) => {
+      r.addEventListener("input", () => {
+        const k = r.dataset.key;
+        S[k] = Number(r.value);
+        r.style.setProperty("--p", S[k] + "%");
+        $(`[data-out="${k}"]`, body).textContent = S[k] + "%";
+        if (k === "musicVol") musicCtl.volume(S[k] / 100);
+      });
+      r.addEventListener("change", () => { saveSettings(); if (r.dataset.key === "sfxVol") fx.sound("ok"); });
+    });
+    const test = $("#sfxTest", body);
+    if (test) test.addEventListener("click", () => { fx.sound("level"); fx.burst(test, 14); });
+    $$(".track", body).forEach((t) => t.addEventListener("click", () => {
+      S.track = t.dataset.track; saveSettings();
+      musicCtl.apply().then(() => renderSettings("track:" + S.track));
+      renderSettings("track:" + S.track);
+    }));
+    $("#setReset", body).addEventListener("click", () => { if (resetProgress()) $("#settingsDialog").close(); });
+
+    if (focusKey) {
+      const el = focusKey.startsWith("track:") ? $(`[data-track="${focusKey.slice(6)}"]`, body) : $(`.switch[data-key="${focusKey}"]`, body);
+      if (el) el.focus({ preventScroll: true });
+    }
+  }
+
+  function applySetting(k, src) {
+    if (k === "sfx" && S.sfx) fx.sound("ok");
+    if (k === "music") musicCtl.apply().then(() => { if ($("#settingsDialog").open) renderSettings("music"); });
+    if (k === "bg") { $("#bgCanvas").style.display = S.bg ? "" : "none"; wakeBackground(); }
+    if (k === "motion") document.documentElement.classList.toggle("no-motion", !S.motion);
+    if (k === "confetti" && S.confetti) fx.burst(src, 20);
+  }
+
+  musicCtl.onChange(() => { if ($("#settingsDialog").open) { const f = document.activeElement; renderSettings(); if (f && f.dataset && f.dataset.key) { const again = $(`[data-key="${f.dataset.key}"]`, $("#settingsBody")); if (again) again.focus({ preventScroll: true }); } } });
+  $("#settingsBtn").addEventListener("click", () => { renderSettings(); $("#settingsDialog").showModal(); fx.sound("click"); });
+  $("#settingsDialog").addEventListener("click", (e) => { if (e.target === e.currentTarget) e.currentTarget.close(); });
+  if (!S.bg) $("#bgCanvas").style.display = "none";
 
   /* ---------------- Init ---------------- */
   function init() {
@@ -1689,7 +1842,6 @@
     renderOverview();
     renderSkill();
     renderRush();
-    renderSoundBtn();
     renderInventory();
     renderQuest();
     renderSQGrid();
@@ -1702,8 +1854,8 @@ renderCards("edu");
     route();
   }
 
-  $("#resetBtn").addEventListener("click", () => {
-    if (!confirm("Reset your XP, habits and scores on this device?")) return;
+  function resetProgress() {
+    if (!confirm("Reset your XP, habits, badges and scores on this device? Your settings stay.")) return false;
     state = fresh(); save();
     qs.wrong = []; qs.solved = false; sq = null; $("#sqPlayer").hidden = true;
     bal.round = 0; bal.pick = null; bal.tries = 0; bal.angle = 0;
@@ -1712,7 +1864,9 @@ renderCards("edu");
     clearInterval(rush.timer); rush.phase = "idle";
     init();
     toast("Progress reset");
-  });
+    return true;
+  }
+  $("#resetBtn").addEventListener("click", resetProgress);
 
   initLoader();
   init();

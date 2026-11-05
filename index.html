@@ -55,10 +55,6 @@
       </div>
 
       <div class="hud">
-        <button type="button" class="hud-btn" id="soundBtn" aria-pressed="false" title="Sound effects">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5 6 9H3v6h3l5 4z"/><path class="wave" d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13"/><path class="mute" d="m16 9 6 6M22 9l-6 6"/></svg>
-          <span class="sr-only">Sound effects</span>
-        </button>
         <button type="button" class="lcd" id="lcdBtn" title="View your badges (progress is saved in this browser)">
           <span class="lcd-label">XP</span>
           <span class="lcd-value" id="xpValue">0000</span>
@@ -74,6 +70,10 @@
       <a href="#hub" data-tab="hub" class="pill">Resource Hub</a>
       <a href="#educators" data-tab="educators" class="pill">Educators</a>
       <a href="#admins" data-tab="admins" class="pill">PLV Admins</a>
+      <button type="button" class="pill pill-settings" id="settingsBtn" aria-haspopup="dialog">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+        <span>Settings</span>
+      </button>
     </nav>
   </header>
 
@@ -242,6 +242,11 @@
   <!-- Approach / policy detail -->
   <dialog class="detail" id="detailDialog" aria-labelledby="detailTitle">
     <div id="detailCard"></div>
+  </dialog>
+
+  <!-- Settings -->
+  <dialog class="badges settings" id="settingsDialog" aria-labelledby="setTitle">
+    <div id="settingsBody"></div>
   </dialog>
 
   <!-- Badges -->
