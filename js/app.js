@@ -1308,6 +1308,7 @@
       finished = true;
       pctEl.textContent = "100%"; bar.style.width = "100%"; msg.textContent = msgs[msgs.length - 1];
       L.classList.add("done");
+      if (music) music.fadeOut();
       document.documentElement.classList.remove("is-loading");
       setTimeout(() => L.remove(), reduceMotion ? 50 : 900);
     }
@@ -1322,9 +1323,114 @@
       requestAnimationFrame(tick);
     }
     requestAnimationFrame(tick);
+    /* ---- background music for the loading screen ---- */
+    const music = state.loaderMusic === false ? null : createLoaderMusic();
+    const mBtn = $("#loadMusic");
+    const setBtn = () => {
+      if (!mBtn) return;
+      const on = music && music.running && !music.muted;
+      mBtn.textContent = on ? "♪ Music on · tap to mute" : (music && music.running ? "♪ Music muted · tap to play" : "♪ Tap for music");
+      mBtn.setAttribute("aria-pressed", String(!!on));
+      mBtn.classList.toggle("on", !!on);
+    };
+    if (music) {
+      music.start().then(setBtn);           // works if the browser allows autoplay
+      setTimeout(() => { if (mBtn && !finished) { mBtn.hidden = false; setBtn(); } }, 250);
+    } else if (mBtn) {
+      mBtn.hidden = false; mBtn.textContent = "♪ Music off · tap to play";
+    }
+    if (mBtn) mBtn.addEventListener("click", (e) => {
+      e.stopPropagation(); // don't skip the loader
+      if (!music) { state.loaderMusic = true; persist(); mBtn.textContent = "♪ Music on next visit"; return; }
+      if (!music.running) { music.start().then(setBtn); state.loaderMusic = true; }
+      else { music.setMuted(!music.muted); state.loaderMusic = !music.muted; setBtn(); }
+      persist();
+    });
+
     L.addEventListener("click", finish);
     document.addEventListener("keydown", (e) => { if (e.key === "Escape" || e.key === "Enter") finish(); }, { once: true });
     setTimeout(finish, 6000); // safety net
+  }
+
+
+  /* ==========================================================
+     LOADING-SCREEN MUSIC (generated live with Web Audio, no files)
+     Soft lo-fi loop: Cmaj7 - Am7 - Fmaj7 - G7 at 90 BPM
+     ========================================================== */
+  function createLoaderMusic() {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return null;
+    let ctx;
+    try { ctx = new AC(); } catch (e) { return null; }
+    const master = ctx.createGain(); master.gain.value = 0.0001;
+    const tone = ctx.createBiquadFilter(); tone.type = "lowpass"; tone.frequency.value = 2600;
+    const delay = ctx.createDelay(); delay.delayTime.value = 0.33;
+    const fb = ctx.createGain(); fb.gain.value = 0.28;
+    const wet = ctx.createGain(); wet.gain.value = 0.25;
+    tone.connect(master); tone.connect(delay); delay.connect(fb).connect(delay); delay.connect(wet).connect(master);
+    master.connect(ctx.destination);
+
+    const mf = (m) => 440 * Math.pow(2, (m - 69) / 12);
+    const CHORDS = [[60, 64, 67, 71], [57, 60, 64, 67], [53, 57, 60, 64], [55, 59, 62, 65]];
+    const ARP = [0, 1, 2, 3, 2, 1, 2, 3];
+    const STEP = 60 / 90 / 4; // sixteenth notes
+    let step = 0, next = 0, timer = null, muted = false;
+
+    const noise = ctx.createBuffer(1, Math.floor(ctx.sampleRate * 0.05), ctx.sampleRate);
+    const nd = noise.getChannelData(0);
+    for (let i = 0; i < nd.length; i++) nd[i] = (Math.random() * 2 - 1) * (1 - i / nd.length);
+
+    function voice(freq, t, dur, type, vol, attack) {
+      const o = ctx.createOscillator(), g = ctx.createGain();
+      o.type = type; o.frequency.value = freq;
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(vol, t + (attack || 0.01));
+      g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      o.connect(g).connect(tone); o.start(t); o.stop(t + dur + 0.05);
+    }
+    function hat(t) {
+      const src = ctx.createBufferSource(), hp = ctx.createBiquadFilter(), g = ctx.createGain();
+      src.buffer = noise; hp.type = "highpass"; hp.frequency.value = 7000; g.gain.value = 0.05;
+      src.connect(hp).connect(g).connect(master); src.start(t);
+    }
+    function schedule(s, t) {
+      const chord = CHORDS[Math.floor(s / 16) % CHORDS.length];
+      const b = s % 16;
+      if (b === 0) chord.forEach((n) => voice(mf(n), t, STEP * 16, "sine", 0.03, 0.35));           // pad
+      if (b === 0 || b === 10) voice(mf(chord[0] - 24), t, STEP * 6, "sine", 0.2, 0.02);          // bass
+      if (b % 2 === 0) voice(mf(chord[ARP[b / 2]] + 12), t, 0.32, "triangle", 0.06);              // arp
+      if (b % 4 === 2) hat(t);                                                                   // hats
+      if (b === 14 && Math.random() < 0.6) voice(mf(chord[(Math.random() * 4) | 0] + 24), t, 0.6, "sine", 0.03); // chime
+    }
+    function pump() {
+      while (next < ctx.currentTime + 0.15) { schedule(step, next); step++; next += STEP; }
+    }
+    function fadeTo(v, secs) {
+      const t = ctx.currentTime;
+      master.gain.cancelScheduledValues(t);
+      master.gain.setValueAtTime(Math.max(master.gain.value, 0.0001), t);
+      master.gain.exponentialRampToValueAtTime(Math.max(v, 0.0001), t + secs);
+    }
+    return {
+      get running() { return ctx.state === "running"; },
+      get muted() { return muted; },
+      start() {
+        const go = () => {
+          if (timer) return;
+          next = ctx.currentTime + 0.05;
+          timer = setInterval(pump, 25); pump();
+          fadeTo(muted ? 0.0001 : 0.5, 1.2);
+        };
+        if (ctx.state === "suspended") return ctx.resume().then(go, () => {});
+        go(); return Promise.resolve();
+      },
+      setMuted(m) { muted = m; if (timer) fadeTo(m ? 0.0001 : 0.5, 0.4); },
+      fadeOut() {
+        if (!timer) { try { ctx.close(); } catch (e) {} return; }
+        fadeTo(0.0001, 1.6);
+        setTimeout(() => { clearInterval(timer); timer = null; try { ctx.close(); } catch (e) {} }, 1800);
+      }
+    };
   }
 
   /* ==========================================================
