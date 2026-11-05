@@ -3,49 +3,223 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Astra</title>
-  <meta name="description" content="Astra — a new project." />
+  <title>ASTRA — Digital Accounting Education Hub</title>
+  <meta name="description" content="A gamified, centralized online hub with supplementary resources and practical learning opportunities for digital accounting education." />
+  <meta name="theme-color" content="#0a0f2e" />
   <link rel="icon" href="assets/favicon.svg" type="image/svg+xml" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=DM+Sans:wght@400;500;700&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="css/style.css" />
 </head>
 <body>
-  <header class="site-header">
-    <a class="brand" href="#">Astra</a>
-    <nav>
-      <a href="#about">About</a>
-      <a href="#features">Features</a>
-      <a href="#contact">Contact</a>
+  <a class="skip" href="#main">Skip to content</a>
+
+  <!-- ============ HEADER ============ -->
+  <header class="topbar">
+    <div class="topbar-inner wrap">
+      <a class="brand" href="#home" aria-label="ASTRA home">
+        <svg class="brand-mark" viewBox="0 0 40 40" aria-hidden="true">
+          <rect x="2" y="2" width="36" height="36" rx="9" fill="#7b8cff"/>
+          <rect x="8" y="7" width="24" height="9" rx="2.5" fill="#0a0f2e"/>
+          <rect x="8" y="20" width="6" height="5" rx="1.5" fill="#ffd23f"/>
+          <rect x="17" y="20" width="6" height="5" rx="1.5" fill="#0a0f2e"/>
+          <rect x="26" y="20" width="6" height="12" rx="1.5" fill="#46d6b0"/>
+          <rect x="8" y="27" width="6" height="5" rx="1.5" fill="#0a0f2e"/>
+          <rect x="17" y="27" width="6" height="5" rx="1.5" fill="#ff8a75"/>
+        </svg>
+        <span>ASTRA</span>
+      </a>
+
+      <div class="lcd" title="Your progress is saved in this browser">
+        <span class="lcd-label">XP</span>
+        <span class="lcd-value" id="xpValue">0000</span>
+        <span class="lcd-rank" id="rankValue">Intern</span>
+      </div>
+    </div>
+
+    <nav class="tabs wrap" aria-label="Sections">
+      <a href="#home" data-tab="home" class="pill">Home</a>
+      <a href="#students" data-tab="students" class="pill">Students</a>
+      <a href="#hub" data-tab="hub" class="pill">Resource Hub</a>
+      <a href="#educators" data-tab="educators" class="pill">Educators</a>
+      <a href="#admins" data-tab="admins" class="pill">PLV Admins</a>
     </nav>
   </header>
 
-  <main>
-    <section class="hero">
-      <h1>Welcome to <span>Astra</span></h1>
-      <p>A new project, ready to grow.</p>
-      <a class="btn" href="#about">Learn more</a>
-    </section>
+  <main id="main">
 
-    <section id="about" class="section">
-      <h2>About</h2>
-      <p>Describe what Astra is and who it's for.</p>
-    </section>
+    <!-- ============ HOME ============ -->
+    <section class="view" id="view-home" data-view="home" aria-labelledby="homeTitle">
+      <div class="hero wrap">
+        <div class="hero-copy">
+          <div class="fx"><span class="fx-icon">ƒx</span><code>=WELCOME("Future CPA")</code></div>
+          <h1 id="homeTitle">Digital Accounting <span class="hl">Education Hub</span></h1>
+          <p class="lead">A centralized online hub with supplementary resources and practical learning opportunities. Build your technical competencies and get ready for technology in the accounting profession.</p>
+          <div class="hero-cta">
+            <a class="key key-yellow" href="#students">Start the quest →</a>
+            <a class="key key-ghost" href="#hub">Browse resources</a>
+          </div>
+        </div>
 
-    <section id="features" class="section">
-      <h2>Features</h2>
-      <div class="grid">
-        <article class="card"><h3>Feature one</h3><p>Short description.</p></article>
-        <article class="card"><h3>Feature two</h3><p>Short description.</p></article>
-        <article class="card"><h3>Feature three</h3><p>Short description.</p></article>
+        <!-- calculator that doubles as navigation -->
+        <div class="calc" aria-label="Quick navigation">
+          <div class="calc-screen">
+            <div class="calc-sub" id="calcSub">RANK: INTERN</div>
+            <div class="calc-main" id="calcMain">0 XP</div>
+          </div>
+          <div class="calc-keys">
+            <a href="#students" class="ck ck-yellow"><b>STU</b><small>Students</small></a>
+            <a href="#hub" class="ck ck-blue"><b>HUB</b><small>Resources</small></a>
+            <a href="#educators" class="ck ck-coral"><b>EDU</b><small>Educators</small></a>
+            <a href="#admins" class="ck ck-mint"><b>ADM</b><small>PLV Admins</small></a>
+            <a href="#sidequests" class="ck ck-dark ck-wide"><b>=</b><small>Play side quests</small></a>
+          </div>
+        </div>
+      </div>
+
+      <!-- Overview -->
+      <div class="wrap block">
+        <div class="section-head">
+          <p class="eyebrow">Overview</p>
+          <h2>What's inside</h2>
+        </div>
+        <div class="overview">
+          <a class="ov ov-yellow" href="#students">
+            <span class="ov-k">For accounting students</span>
+            <strong>Five habits that pay off</strong>
+            <span>Habits for building skills that carry across systems, plus a case-study quest and side quests.</span>
+            <span class="ov-arrow" aria-hidden="true">→</span>
+          </a>
+          <a class="ov ov-blue" href="#hub">
+            <span class="ov-k">Resource hub</span>
+            <strong>Tutorials to templates</strong>
+            <span>Software guides, exercises, videos, case studies and templates.</span>
+            <span class="ov-arrow" aria-hidden="true">→</span>
+          </a>
+          <a class="ov ov-coral" href="#educators">
+            <span class="ov-k">For educators</span>
+            <strong>Seven approaches</strong>
+            <span>Ways to teach with software, simulations and rubrics.</span>
+            <span class="ov-arrow" aria-hidden="true">→</span>
+          </a>
+          <a class="ov ov-mint" href="#admins">
+            <span class="ov-k">For PLV admins</span>
+            <strong>Five policies</strong>
+            <span>Suggested university policies for technology-integrated instruction.</span>
+            <span class="ov-arrow" aria-hidden="true">→</span>
+          </a>
+        </div>
+      </div>
+
+      <!-- Mini interactive -->
+      <div class="wrap block">
+        <div class="section-head">
+          <p class="eyebrow">Mini interactive</p>
+          <h2>Warm up before the quest</h2>
+        </div>
+        <div class="try-grid">
+          <div class="panel" id="balanceGame"></div>
+          <div class="panel" id="thinkGame"></div>
+        </div>
       </div>
     </section>
 
-    <section id="contact" class="section">
-      <h2>Contact</h2>
-      <p>Email: <a href="mailto:mjmallorca04@gmail.com">mjmallorca04@gmail.com</a></p>
+    <!-- ============ STUDENTS ============ -->
+    <section class="view" id="view-students" data-view="students" aria-labelledby="stuTitle" hidden>
+      <div class="wrap page-head">
+        <div class="fx"><span class="fx-icon">ƒx</span><code>=HABITS("pay off", 5)</code></div>
+        <p class="eyebrow">For accounting students</p>
+        <h1 id="stuTitle">Five habits <span class="hl">that pay off</span></h1>
+        <p class="lead">Clear the case study to collect all five habits. Each challenge you finish unlocks one habit for your inventory.</p>
+      </div>
+
+      <div class="wrap block">
+        <div class="quest-layout">
+          <div class="panel quest" id="questPanel"></div>
+          <aside class="inventory" aria-label="Habit inventory">
+            <div class="inv-head">
+              <h2>Inventory</h2>
+              <span class="chip" id="invCount">0 / 5</span>
+            </div>
+            <ol class="inv-list" id="invList"></ol>
+          </aside>
+        </div>
+      </div>
+
+      <div class="wrap block" id="sidequests">
+        <div class="section-head">
+          <p class="eyebrow">Side quests</p>
+          <h2>Accounting competency mini-games</h2>
+          <p class="muted">Intermediate to advanced. 10 activities each, +10 XP for every correct answer.</p>
+        </div>
+        <div class="sq-grid" id="sqGrid"></div>
+        <div class="panel sq-player" id="sqPlayer" hidden></div>
+      </div>
     </section>
+
+    <!-- ============ RESOURCE HUB ============ -->
+    <section class="view" id="view-hub" data-view="hub" aria-labelledby="hubTitle" hidden>
+      <div class="wrap page-head">
+        <p class="eyebrow">Digital accounting learning resource hub</p>
+        <h1 id="hubTitle">Tutorials <span class="hl">to templates</span></h1>
+        <p class="lead">Supplementary resources and practical learning opportunities to help you understand digital accounting concepts, build technical competencies, and prepare for the growing use of technology in the profession.</p>
+      </div>
+
+      <div class="wrap block">
+        <div class="sheet">
+          <div class="fx fx-sheet"><span class="fx-icon">ƒx</span><code id="hubFormula"></code></div>
+          <div class="sheet-body" id="hubBody" role="tabpanel"></div>
+          <div class="sheet-tabs" role="tablist" aria-label="Resource types" id="hubTabs"></div>
+        </div>
+        <p class="note">Video links open on the creators' own YouTube channels, so all credit stays with them.</p>
+      </div>
+    </section>
+
+    <!-- ============ EDUCATORS ============ -->
+    <section class="view" id="view-educators" data-view="educators" aria-labelledby="eduTitle" hidden>
+      <div class="wrap page-head">
+        <div class="fx"><span class="fx-icon">ƒx</span><code>=APPROACHES("teach", 7)</code></div>
+        <p class="eyebrow">For educators</p>
+        <h1 id="eduTitle">Seven <span class="hl">suggested approaches</span></h1>
+        <p class="lead">Ways to teach with software, simulations and rubrics. Open each card to see how to apply it in class.</p>
+        <div class="progress-line"><span class="chip" id="eduCount">0 / 7 explored</span><div class="bar"><i id="eduBar"></i></div></div>
+      </div>
+      <div class="wrap block">
+        <div class="cards" id="eduCards"></div>
+      </div>
+    </section>
+
+    <!-- ============ PLV ADMINS ============ -->
+    <section class="view" id="view-admins" data-view="admins" aria-labelledby="admTitle" hidden>
+      <div class="wrap page-head">
+        <div class="fx"><span class="fx-icon">ƒx</span><code>=POLICIES("PLV", 5)</code></div>
+        <p class="eyebrow">For PLV admins</p>
+        <h1 id="admTitle">Five <span class="hl">suggested university policies</span></h1>
+        <p class="lead">Policies for technology-integrated instruction across the accounting program. Open each card to read it.</p>
+        <div class="progress-line"><span class="chip" id="admCount">0 / 5 explored</span><div class="bar"><i id="admBar"></i></div></div>
+      </div>
+      <div class="wrap block">
+        <div class="cards" id="admCards"></div>
+      </div>
+    </section>
+
   </main>
 
-  <footer class="site-footer">© <span id="year"></span> Astra</footer>
-  <script src="js/main.js"></script>
+  <!-- ============ FOOTER ============ -->
+  <footer class="footer">
+    <div class="wrap footer-inner">
+      <p class="disclaimer"><strong>Disclaimer:</strong> The content of this website is based on the results of the study conducted by the ASTRA research team. Activities are intended for learning and practice.</p>
+      <div class="footer-row">
+        <span>© <span id="year"></span> ASTRA · Digital Accounting Education Hub</span>
+        <button class="linkish" id="resetBtn" type="button">Reset my progress</button>
+      </div>
+    </div>
+  </footer>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script src="js/data.js"></script>
+  <script src="js/app.js"></script>
 </body>
 </html>
