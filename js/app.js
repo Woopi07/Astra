@@ -761,6 +761,76 @@
      RESOURCE HUB
      ========================================================== */
   let hubActive = 0;
+  /* ---- on-site video player (official YouTube embed) ---- */
+  function ytEmbed(url) {
+    try {
+      const u = new URL(url);
+      if (!/youtube\.com$|youtu\.be$/.test(u.hostname.replace(/^www\./, ""))) return null;
+      const list = u.searchParams.get("list");
+      const id = u.hostname.includes("youtu.be") ? u.pathname.slice(1) : u.searchParams.get("v");
+      const base = "https://www.youtube-nocookie.com/embed/";
+      const q = "autoplay=1&rel=0&modestbranding=1&playsinline=1";
+      if (id) return `${base}${encodeURIComponent(id)}?${q}${list ? "&list=" + encodeURIComponent(list) : ""}`;
+      if (list) return `${base}videoseries?list=${encodeURIComponent(list)}&${q}`;
+    } catch (e) { /* not a URL */ }
+    return null;
+  }
+  const player = { tab: 0, i: 0 };
+  function videosIn(tab) { return HUB_TABS[tab].links.map((l, i) => ({ l, i })).filter((x) => x.l.kind === "video" && ytEmbed(x.l.url)); }
+  function openVideo(tab, i) {
+    player.tab = tab; player.i = i;
+    const l = HUB_TABS[tab].links[i];
+    const list = videosIn(tab), pos = list.findIndex((x) => x.i === i);
+    $("#videoBody").innerHTML = `
+      <div class="detail-inner sw-in video-inner">
+        <div class="detail-head">
+          <div class="detail-titles">
+            <span class="mono-k">${esc(HUB_TABS[tab].title)} · ${pos + 1} of ${list.length}</span>
+            <h3 id="videoTitle">${esc(l.label)}</h3>
+          </div>
+          <button type="button" class="hud-btn" id="videoClose" aria-label="Close video">✕</button>
+        </div>
+        <div class="video-frame">
+          <div class="video-loading" aria-hidden="true"><span class="eq playing"><i></i><i></i><i></i></span>Loading video…</div>
+          <iframe src="${esc(ytEmbed(l.url))}" title="${esc(l.label)}" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen referrerpolicy="strict-origin-when-cross-origin" loading="lazy"></iframe>
+        </div>
+        <div class="video-bar">
+          <span class="tag">${esc(l.tag)}</span>
+          <a class="video-yt" href="${esc(l.url)}" target="_blank" rel="noopener noreferrer">Video not playing? Watch on YouTube ↗</a>
+        </div>
+        <p class="video-credit">Played through YouTube's official player, so views and credit go to the creator.</p>
+        ${list.length > 1 ? `<div class="detail-nav">
+          <button type="button" class="key key-ghost" id="vidPrev" aria-label="Previous video">←</button>
+          <div class="detail-dots">${list.map((x) => `<button type="button" class="ddot ${x.i === i ? "on" : ""} ${(state.watched || []).includes(x.l.url) ? "seen" : ""}" data-v="${x.i}" aria-label="${esc(x.l.label)}"></button>`).join("")}</div>
+          <button type="button" class="key key-yellow" id="vidNext" aria-label="Next video">→</button>
+        </div>` : ""}
+      </div>`;
+    const dlg = $("#videoDialog");
+    const frame = $("iframe", dlg);
+    frame.addEventListener("load", () => dlg.classList.add("ready"), { once: true });
+    dlg.classList.remove("ready");
+    $("#videoClose", dlg).addEventListener("click", () => dlg.close());
+    const step = (d) => { const k = (pos + d + list.length) % list.length; openVideo(tab, list[k].i); };
+    const pv = $("#vidPrev", dlg), nx = $("#vidNext", dlg);
+    if (pv) pv.addEventListener("click", () => step(-1));
+    if (nx) nx.addEventListener("click", () => step(1));
+    $$(".ddot", dlg).forEach((d) => d.addEventListener("click", () => openVideo(tab, Number(d.dataset.v))));
+    state.watched = state.watched || [];
+    if (!state.watched.includes(l.url)) { state.watched.push(l.url); save(); }
+    musicCtl.hold(true); // let the video's sound play on its own
+    if (!dlg.open) dlg.showModal();
+  }
+  (function initVideoDialog() {
+    const dlg = $("#videoDialog");
+    dlg.addEventListener("click", (e) => { if (e.target === dlg) dlg.close(); });
+    dlg.addEventListener("close", () => {
+      $("#videoBody").innerHTML = ""; // stops playback
+      musicCtl.hold(false);
+      renderHub();
+      const back = $(`.res-video[data-vid="${player.i}"]`); if (back) back.focus({ preventScroll: true });
+    });
+  })();
+
   function renderHub() {
     const tabs = $("#hubTabs");
     tabs.innerHTML = HUB_TABS.map((t, i) => `<button type="button" class="sheet-tab" role="tab" id="tab-${t.id}" aria-selected="${i === hubActive}" tabindex="${i === hubActive ? 0 : -1}" data-i="${i}">${esc(t.label)}</button>`).join("");
@@ -775,14 +845,21 @@
         <h3>${esc(t.title)}</h3>
         <p>${esc(t.desc)}</p>
         <ul class="res-list">
-          ${t.links.map((l) => {
+          ${t.links.map((l, i) => {
             const ext = l.kind !== "internal";
-            const kind = l.kind === "video" ? "▶ YouTube" : l.kind === "site" ? "↗ Website" : "◆ Play on ASTRA";
-            return `<li><a class="res" href="${esc(l.url)}" ${ext ? 'target="_blank" rel="noopener noreferrer"' : ""}>
-              <span class="tag">${esc(l.tag)}</span><span class="lbl">${esc(l.label)}</span><span class="kind">${kind}</span></a></li>`;
+            const isVid = l.kind === "video" && ytEmbed(l.url);
+            const seen = isVid && (state.watched || []).includes(l.url);
+            const kind = isVid ? "▶ Watch here" : l.kind === "site" ? "↗ Website" : "◆ Play on ASTRA";
+            return `<li><a class="res ${isVid ? "res-video" : ""}" href="${esc(l.url)}" ${isVid ? `data-vid="${i}"` : ""} ${ext ? 'target="_blank" rel="noopener noreferrer"' : ""}>
+              <span class="tag">${esc(l.tag)}</span><span class="lbl">${esc(l.label)}</span><span class="kind">${kind}${seen ? ' <span class="watched">✓ Watched</span>' : ""}</span></a></li>`;
           }).join("")}
         </ul>
       </div>`;
+    $$(".res-video", body).forEach((a) => a.addEventListener("click", (e) => {
+      if (e.metaKey || e.ctrlKey || e.shiftKey || e.button === 1) return; // let "open in new tab" work
+      e.preventDefault();
+      openVideo(hubActive, Number(a.dataset.vid));
+    }));
     $$(".sheet-tab", tabs).forEach((b) => {
       b.addEventListener("click", () => { hubActive = Number(b.dataset.i); renderHub(); });
       b.addEventListener("keydown", (e) => {
@@ -1487,8 +1564,9 @@
     const trackId = () => TRACK_FOR[context] || "lofi";
     const listeners = new Set();
     const notify = () => listeners.forEach((fn) => fn());
+    let held = false;
     function apply() {
-      if (!S.music) { if (eng) eng.stop(); setTimeout(notify, 950); notify(); return Promise.resolve(); }
+      if (!S.music || held) { if (eng) eng.stop(); setTimeout(notify, 950); notify(); return Promise.resolve(); }
       if (!eng) eng = createMusic();
       if (!eng) return Promise.resolve();
       eng.setTrack(trackId(), eng.running);
@@ -1498,7 +1576,7 @@
     // browsers block audio until the visitor interacts: start on the first tap/key if needed
     const kick = (e) => {
       if (e.target && e.target.closest && e.target.closest("#settingsDialog")) return;
-      if (S.music && (!eng || !eng.running)) apply();
+      if (S.music && !held && (!eng || !eng.running)) apply();
     };
     document.addEventListener("pointerdown", kick, { passive: true });
     document.addEventListener("keydown", kick);
@@ -1513,6 +1591,7 @@
         notify();
       },
       tempo(m) { if (eng) eng.setTempo(m); },
+      hold(on) { if (held === on) return; held = on; apply(); },
       get now() { return TRACKS[trackId()]; },
       get running() { return !!eng && eng.running && S.music; },
       onChange(fn) { listeners.add(fn); }
@@ -1524,7 +1603,7 @@
      ========================================================== */
   function initKeys() {
     document.addEventListener("keydown", (e) => {
-      if (e.ctrlKey || e.metaKey || e.altKey || $("#loader:not(.done)") || $("#badgeDialog").open || $("#detailDialog").open || $("#settingsDialog").open) return;
+      if (e.ctrlKey || e.metaKey || e.altKey || $("#loader:not(.done)") || $("#badgeDialog").open || $("#detailDialog").open || $("#settingsDialog").open || $("#videoDialog").open) return;
       const tag = (e.target.tagName || "").toLowerCase();
       if (tag === "input" || tag === "textarea" || tag === "select") return;
       const view = ($(".view:not([hidden])") || {}).dataset?.view;
