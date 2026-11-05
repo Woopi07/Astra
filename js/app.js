@@ -759,52 +759,359 @@
   }
 
   /* ==========================================================
-     EDUCATORS / ADMINS — expandable cards
+     EDUCATORS / ADMINS — cards, detail view, plan/roadmap, match game
      ========================================================== */
   const COLORS = ["var(--yellow)", "var(--blue)", "var(--coral)", "var(--mint)"];
+  const READY = [["doing", "Already doing it"], ["try", "Want to try it"], ["later", "Not yet"]];
+  const STATUS = [["none", "Not started"], ["progress", "In progress"], ["done", "Implemented"]];
+  const PRIORITY = [[1, "Low"], [2, "Medium"], [3, "High"]];
 
-  function renderCards(cfg) {
-    const { list, mount, seenKey, countEl, barEl, label, bodyFn } = cfg;
-    const wrap = $(mount);
+  const KINDS = {
+    edu: { list: () => APPROACHES, seenKey: "seenEdu", mount: "#eduCards", countEl: "#eduCount", barEl: "#eduBar", label: "approaches", noun: "Approach" },
+    adm: { list: () => POLICIES, seenKey: "seenAdm", mount: "#admCards", countEl: "#admCount", barEl: "#admBar", label: "policies", noun: "Policy" }
+  };
+  const ensureMaps = () => {
+    state.eduPlan = state.eduPlan || {};
+    state.eduReady = state.eduReady || {};
+    state.admStatus = state.admStatus || {};
+    state.admPriority = state.admPriority || {};
+  };
+
+  function cardMeta(kind, i) {
+    ensureMaps();
+    if (kind === "edu") {
+      const planned = (state.eduPlan[i] || []).length, total = APPROACHES[i].how.length;
+      const ready = READY.find((r) => r[0] === state.eduReady[i]);
+      return `${planned ? `<span class="meta-chip mint">${planned}/${total} in plan</span>` : ""}${ready ? `<span class="meta-chip">${esc(ready[1])}</span>` : ""}`;
+    }
+    const st = STATUS.find((r) => r[0] === state.admStatus[i]);
+    const pr = PRIORITY.find((r) => r[0] === state.admPriority[i]);
+    return `${st && st[0] !== "none" ? `<span class="meta-chip ${st[0] === "done" ? "mint" : "yellow"}">${esc(st[1])}</span>` : ""}${pr ? `<span class="meta-chip">${esc(pr[1])} priority</span>` : ""}`;
+  }
+
+  function renderCards(kind) {
+    const K = KINDS[kind], list = K.list();
+    const wrap = $(K.mount);
     wrap.innerHTML = list.map((item, i) => `
-      <article class="card">
-        <button type="button" class="card-btn" aria-expanded="false" aria-controls="${seenKey}-${i}">
+      <article class="card" data-tilt>
+        <button type="button" class="card-btn" data-i="${i}" aria-haspopup="dialog">
           <span class="card-num" style="background:${COLORS[i % COLORS.length]}">${String(i + 1).padStart(2, "0")}</span>
-          <span>
+          <span class="card-txt">
             <span class="card-title">${esc(item.title)}</span>
-            ${state[seenKey].includes(i) ? '<span class="seen-dot">● Explored</span>' : ""}
+            <span class="card-metas">${state[K.seenKey].includes(i) ? '<span class="seen-dot">● Explored</span>' : '<span class="seen-dot new">○ Tap to open</span>'}${cardMeta(kind, i)}</span>
           </span>
-          <span class="chev" aria-hidden="true">+</span>
+          <span class="chev" aria-hidden="true">↗</span>
         </button>
-        <div class="card-body" id="${seenKey}-${i}" hidden>${bodyFn(item)}</div>
       </article>`).join("");
+    const n = state[K.seenKey].length;
+    $(K.countEl).textContent = `${n} / ${list.length} explored`;
+    $(K.barEl).style.width = (n / list.length) * 100 + "%";
+    $$(".card-btn", wrap).forEach((btn) => btn.addEventListener("click", () => openDetail(kind, Number(btn.dataset.i), 0, btn)));
+    if (kind === "edu") renderPlan(); else renderRoadmap();
+  }
 
-    const update = () => {
-      const n = state[seenKey].length;
-      $(countEl).textContent = `${n} / ${list.length} explored`;
-      $(barEl).style.width = (n / list.length) * 100 + "%";
-    };
-    update();
+  /* ---- detail dialog ---- */
+  const detail = { kind: "edu", i: 0, opener: null };
 
-    $$(".card-btn", wrap).forEach((btn, i) => btn.addEventListener("click", () => {
-      const card = btn.closest(".card");
-      const body = card.querySelector(".card-body");
-      const open = btn.getAttribute("aria-expanded") === "true";
-      btn.setAttribute("aria-expanded", String(!open));
-      body.hidden = open;
-      card.classList.toggle("open", !open);
-      if (!open && !state[seenKey].includes(i)) {
-        state[seenKey].push(i);
-        save();
-        const tag = document.createElement("span");
-        tag.className = "seen-dot"; tag.textContent = "● Explored";
-        btn.querySelector(".card-title").after(tag);
-        update();
-        if (state[seenKey].length === list.length) toast(`All ${list.length} ${label} explored ✓`);
+  function openDetail(kind, i, dir, opener) {
+    detail.kind = kind; detail.i = i;
+    if (opener) detail.opener = opener;
+    const K = KINDS[kind];
+    if (!state[K.seenKey].includes(i)) {
+      state[K.seenKey].push(i); save();
+      if (state[K.seenKey].length === K.list().length) toast(`All ${K.list().length} ${K.label} explored ✓`);
+    }
+    renderDetail(dir);
+    const dlg = $("#detailDialog");
+    if (!dlg.open) dlg.showModal();
+    fx.sound("click");
+  }
+
+  function renderDetail(dir) {
+    ensureMaps();
+    const { kind, i } = detail;
+    const K = KINDS[kind], list = K.list(), item = list[i];
+    const color = COLORS[i % COLORS.length];
+    let body = "";
+    if (kind === "edu") {
+      const plan = state.eduPlan[i] || [];
+      const pct = plan.length / item.how.length;
+      body = `
+        <p class="detail-sum">${esc(item.summary)}</p>
+        <div class="detail-sec-head"><h4>How to apply? <small>Tap a step to add it to your teaching plan</small></h4>${ring(pct)}</div>
+        <ul class="steps">
+          ${item.how.map((h, k) => {
+            const on = plan.includes(k);
+            return `<li><button type="button" class="step ${on ? "on" : ""}" data-k="${k}" aria-pressed="${on}"><span class="step-box">${on ? "✓" : k + 1}</span><span>${esc(h)}</span></button></li>`;
+          }).join("")}
+        </ul>
+        <h4>Where are you with this approach?</h4>
+        <div class="seg" role="group" aria-label="Readiness">${READY.map(([v, l]) => `<button type="button" class="seg-btn ${state.eduReady[i] === v ? "on" : ""}" data-ready="${v}" aria-pressed="${state.eduReady[i] === v}">${esc(l)}</button>`).join("")}</div>`;
+    } else {
+      body = `
+        <p class="detail-sum">${esc(item.desc)}</p>
+        <h4>Implementation status</h4>
+        <div class="seg status-seg" role="group" aria-label="Implementation status">${STATUS.map(([v, l], k) => `<button type="button" class="seg-btn st-${v} ${(state.admStatus[i] || "none") === v ? "on" : ""}" data-status="${v}" aria-pressed="${(state.admStatus[i] || "none") === v}"><span class="st-dot"></span>${esc(l)}</button>`).join("")}</div>
+        <h4>Priority for PLV</h4>
+        <div class="seg" role="group" aria-label="Priority">${PRIORITY.map(([v, l]) => `<button type="button" class="seg-btn ${state.admPriority[i] === v ? "on" : ""}" data-pri="${v}" aria-pressed="${state.admPriority[i] === v}"><span class="pri-bars p${v}"><i></i><i></i><i></i></span>${esc(l)}</button>`).join("")}</div>`;
+    }
+    $("#detailCard").innerHTML = `
+      <div class="detail-inner ${dir > 0 ? "sw-r" : dir < 0 ? "sw-l" : "sw-in"}" style="--accent:${color}">
+        <div class="detail-head">
+          <span class="card-num big" style="background:${color}">${String(i + 1).padStart(2, "0")}</span>
+          <div class="detail-titles">
+            <span class="mono-k">${K.noun} ${i + 1} of ${list.length}</span>
+            <h3 id="detailTitle">${esc(item.title)}</h3>
+          </div>
+          <button type="button" class="hud-btn" id="detailClose" aria-label="Close">✕</button>
+        </div>
+        <div class="detail-body">${body}</div>
+        <div class="detail-nav">
+          <button type="button" class="key key-ghost" id="detailPrev" aria-label="Previous">←</button>
+          <div class="detail-dots">${list.map((_, k) => `<button type="button" class="ddot ${k === i ? "on" : ""} ${state[K.seenKey].includes(k) ? "seen" : ""}" data-k="${k}" aria-label="${K.noun} ${k + 1}"></button>`).join("")}</div>
+          <button type="button" class="key key-yellow" id="detailNext" aria-label="Next">→</button>
+        </div>
+      </div>`;
+
+    const card = $("#detailCard");
+    $("#detailClose", card).addEventListener("click", closeDetail);
+    $("#detailPrev", card).addEventListener("click", () => stepDetail(-1));
+    $("#detailNext", card).addEventListener("click", () => stepDetail(1));
+    $$(".ddot", card).forEach((d) => d.addEventListener("click", () => { const k = Number(d.dataset.k); if (k !== i) openDetail(kind, k, k > i ? 1 : -1); }));
+
+    $$(".step", card).forEach((b) => b.addEventListener("click", () => {
+      const k = Number(b.dataset.k);
+      const plan = state.eduPlan[i] = state.eduPlan[i] || [];
+      const at = plan.indexOf(k);
+      if (at >= 0) { plan.splice(at, 1); fx.sound("click"); }
+      else {
+        plan.push(k); plan.sort();
+        good(b, plan.length === item.how.length ? 30 : 10);
+        if (plan.length === item.how.length) toast("All steps added to your plan ✓");
       }
+      if (!plan.length) delete state.eduPlan[i];
+      save(); renderDetail(0); renderCards("edu");
+    }));
+    $$("[data-ready]", card).forEach((b) => b.addEventListener("click", () => {
+      state.eduReady[i] = state.eduReady[i] === b.dataset.ready ? undefined : b.dataset.ready;
+      if (!state.eduReady[i]) delete state.eduReady[i];
+      fx.sound("click"); save(); renderDetail(0); renderCards("edu");
+    }));
+    $$("[data-status]", card).forEach((b) => b.addEventListener("click", () => {
+      state.admStatus[i] = b.dataset.status;
+      if (b.dataset.status === "done") good(b, 24); else fx.sound("click");
+      save(); renderDetail(0); renderCards("adm");
+    }));
+    $$("[data-pri]", card).forEach((b) => b.addEventListener("click", () => {
+      const v = Number(b.dataset.pri);
+      state.admPriority[i] = state.admPriority[i] === v ? undefined : v;
+      if (!state.admPriority[i]) delete state.admPriority[i];
+      fx.sound("click"); save(); renderDetail(0); renderCards("adm");
     }));
   }
 
+  function stepDetail(d) {
+    const n = KINDS[detail.kind].list().length;
+    openDetail(detail.kind, (detail.i + d + n) % n, d);
+  }
+  function closeDetail() {
+    const dlg = $("#detailDialog");
+    if (dlg.open) dlg.close();
+  }
+
+  /* ---- swipe between items on touch ---- */
+  (function initDetailSwipe() {
+    const dlg = $("#detailDialog");
+    let sx = null, sy = null;
+    dlg.addEventListener("touchstart", (e) => { sx = e.touches[0].clientX; sy = e.touches[0].clientY; }, { passive: true });
+    dlg.addEventListener("touchend", (e) => {
+      if (sx === null) return;
+      const dx = e.changedTouches[0].clientX - sx, dy = e.changedTouches[0].clientY - sy;
+      sx = null;
+      if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5) stepDetail(dx < 0 ? 1 : -1);
+    });
+    document.addEventListener("keydown", (e) => {
+      if (!dlg.open) return;
+      if (e.key === "ArrowRight") { e.preventDefault(); stepDetail(1); }
+      else if (e.key === "ArrowLeft") { e.preventDefault(); stepDetail(-1); }
+      else if (e.key === "Escape") { e.preventDefault(); closeDetail(); }
+    });
+    dlg.addEventListener("click", (e) => { if (e.target === dlg) closeDetail(); });
+    dlg.addEventListener("close", () => { if (detail.opener && document.contains(detail.opener)) detail.opener.focus(); else { const b = $(`${KINDS[detail.kind].mount} .card-btn[data-i="${detail.i}"]`); if (b) b.focus(); } });
+  })();
+
+  /* ---- copy helper ---- */
+  function copyText(text, okMsg) {
+    const done = () => { toast(okMsg); fx.sound("ok"); };
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(text).then(done, () => fallback());
+    } else fallback();
+    function fallback() {
+      const ta = document.createElement("textarea");
+      ta.value = text; ta.setAttribute("readonly", ""); ta.style.cssText = "position:fixed;opacity:0;left:-9999px";
+      document.body.appendChild(ta); ta.select();
+      try { document.execCommand("copy"); done(); } catch (e) { toast("Couldn't copy. Select the text and copy it manually."); }
+      ta.remove();
+    }
+  }
+
+  /* ---- Educators: My teaching plan ---- */
+  function renderPlan() {
+    ensureMaps();
+    const el = $("#eduPlan");
+    if (!el) return;
+    const entries = APPROACHES.map((a, i) => ({ a, i, steps: (state.eduPlan[i] || []).map((k) => a.how[k]) })).filter((x) => x.steps.length);
+    const totalSteps = entries.reduce((t, x) => t + x.steps.length, 0);
+    const readyCounts = READY.map(([v, l]) => [l, Object.values(state.eduReady).filter((r) => r === v).length]);
+    el.innerHTML = `
+      <div class="panel-top">
+        <div><span class="mono-k">My teaching plan</span><h3>${totalSteps ? `${totalSteps} step${totalSteps > 1 ? "s" : ""} across ${entries.length} approach${entries.length > 1 ? "es" : ""}` : "Your plan is empty"}</h3></div>
+        ${totalSteps ? '<div class="plan-actions"><button type="button" class="key key-yellow" id="planCopy">Copy plan</button><button type="button" class="linkish" id="planClear">Clear</button></div>' : ""}
+      </div>
+      ${totalSteps ? `<ol class="plan-list">${entries.map((x) => `<li><button type="button" class="plan-head" data-i="${x.i}"><span class="card-num sm" style="background:${COLORS[x.i % COLORS.length]}">${String(x.i + 1).padStart(2, "0")}</span>${esc(x.a.title)}</button><ul>${x.steps.map((st) => `<li>${esc(st)}</li>`).join("")}</ul></li>`).join("")}</ol>`
+        : '<p class="muted">Open an approach and tap its "How to apply" steps to collect them here. Then copy the plan into your syllabus or lesson notes.</p>'}
+      <div class="ready-row">${readyCounts.map(([l, n]) => `<span class="chip">${esc(l)}: <b>${n}</b></span>`).join("")}</div>`;
+    const cp = $("#planCopy", el);
+    if (cp) cp.addEventListener("click", () => {
+      const txt = "MY TEACHING PLAN (ASTRA)\n\n" + entries.map((x) => `${x.i + 1}. ${x.a.title}\n` + x.steps.map((st) => `   - ${st}`).join("\n")).join("\n\n");
+      copyText(txt, "Plan copied to clipboard ✓");
+    });
+    const cl = $("#planClear", el);
+    if (cl) cl.addEventListener("click", () => { if (confirm("Clear your teaching plan?")) { state.eduPlan = {}; save(); renderCards("edu"); } });
+    $$(".plan-head", el).forEach((b) => b.addEventListener("click", () => openDetail("edu", Number(b.dataset.i), 0, b)));
+  }
+
+  /* ---- Admins: Policy roadmap board ---- */
+  function renderRoadmap() {
+    ensureMaps();
+    const el = $("#admRoad");
+    if (!el) return;
+    const cols = STATUS.map(([v, l]) => ({ v, l, items: POLICIES.map((p, i) => ({ p, i })).filter((x) => (state.admStatus[x.i] || "none") === v).sort((x, y) => (state.admPriority[y.i] || 0) - (state.admPriority[x.i] || 0)) }));
+    const score = POLICIES.reduce((t, _, i) => t + ({ none: 0, progress: 0.5, done: 1 }[state.admStatus[i] || "none"]), 0);
+    const pct = Math.round((score / POLICIES.length) * 100);
+    el.innerHTML = `
+      <div class="panel-top">
+        <div><span class="mono-k">PLV policy roadmap</span><h3>Readiness: <span class="hl">${pct}%</span></h3></div>
+        <div class="plan-actions"><button type="button" class="key key-yellow" id="roadCopy">Copy summary</button></div>
+      </div>
+      <div class="bar road-bar"><i style="width:${pct}%"></i></div>
+      <p class="muted road-hint">Drag a policy into a column, or open it to set its status and priority.</p>
+      <div class="board">
+        ${cols.map((c) => `<div class="col" data-status="${c.v}">
+          <div class="col-head st-${c.v}"><span class="st-dot"></span>${esc(c.l)}<b>${c.items.length}</b></div>
+          <div class="col-drop">
+            ${c.items.map((x) => `<button type="button" class="pchip" data-i="${x.i}" draggable="true"><span class="card-num sm" style="background:${COLORS[x.i % COLORS.length]}">${String(x.i + 1).padStart(2, "0")}</span><span class="pchip-t">${esc(x.p.title)}</span>${state.admPriority[x.i] ? `<span class="pri-bars p${state.admPriority[x.i]}" title="${PRIORITY[state.admPriority[x.i] - 1][1]} priority"><i></i><i></i><i></i></span>` : ""}</button>`).join("") || '<span class="col-empty">Drop here</span>'}
+          </div>
+        </div>`).join("")}
+      </div>`;
+    $("#roadCopy", el).addEventListener("click", () => {
+      const lines = POLICIES.map((p, i) => `${i + 1}. ${p.title}\n   Status: ${STATUS.find((s) => s[0] === (state.admStatus[i] || "none"))[1]}${state.admPriority[i] ? ` · Priority: ${PRIORITY[state.admPriority[i] - 1][1]}` : ""}`);
+      copyText(`PLV POLICY ROADMAP (ASTRA)\nReadiness: ${pct}%\n\n` + lines.join("\n"), "Roadmap copied to clipboard ✓");
+    });
+    // click opens detail; HTML5 drag (mouse) + pointer drag (touch) move between columns
+    $$(".pchip", el).forEach((chip) => {
+      chip.addEventListener("click", () => { if (!chip.dataset.dragged) openDetail("adm", Number(chip.dataset.i), 0, chip); delete chip.dataset.dragged; });
+      chip.addEventListener("dragstart", (e) => { e.dataTransfer.setData("text/plain", chip.dataset.i); e.dataTransfer.effectAllowed = "move"; chip.classList.add("dragging"); });
+      chip.addEventListener("dragend", () => chip.classList.remove("dragging"));
+    });
+    $$(".col", el).forEach((col) => {
+      col.addEventListener("dragover", (e) => { e.preventDefault(); col.classList.add("over"); });
+      col.addEventListener("dragleave", () => col.classList.remove("over"));
+      col.addEventListener("drop", (e) => {
+        e.preventDefault(); col.classList.remove("over");
+        const i = Number(e.dataTransfer.getData("text/plain"));
+        if (Number.isNaN(i)) return;
+        movePolicy(i, col.dataset.status, col);
+      });
+    });
+    // touch drag
+    $$(".pchip", el).forEach((chip) => {
+      let t = null;
+      chip.addEventListener("touchstart", (e) => { t = { x: e.touches[0].clientX, y: e.touches[0].clientY, ghost: null }; }, { passive: true });
+      chip.addEventListener("touchmove", (e) => {
+        if (!t) return;
+        const x = e.touches[0].clientX, y = e.touches[0].clientY;
+        if (!t.ghost && Math.hypot(x - t.x, y - t.y) < 10) return;
+        e.preventDefault();
+        if (!t.ghost) { t.ghost = chip.cloneNode(true); t.ghost.classList.add("pchip-ghost"); document.body.appendChild(t.ghost); chip.classList.add("dragging"); }
+        t.ghost.style.left = x + "px"; t.ghost.style.top = y + "px";
+        $$(".col", el).forEach((c) => c.classList.remove("over"));
+        const under = document.elementFromPoint(x, y);
+        const col = under && under.closest(".col"); if (col) col.classList.add("over");
+        t.col = col;
+      }, { passive: false });
+      chip.addEventListener("touchend", () => {
+        if (!t) return;
+        if (t.ghost) {
+          t.ghost.remove(); chip.classList.remove("dragging"); chip.dataset.dragged = "1";
+          $$(".col", el).forEach((c) => c.classList.remove("over"));
+          if (t.col) movePolicy(Number(chip.dataset.i), t.col.dataset.status, t.col);
+        }
+        t = null;
+      });
+    });
+  }
+
+  function movePolicy(i, status, col) {
+    ensureMaps();
+    if ((state.admStatus[i] || "none") === status) return;
+    state.admStatus[i] = status;
+    if (!state.seenAdm.includes(i)) state.seenAdm.push(i);
+    if (status === "done") good(col, 24); else fx.sound("click");
+    save(); renderCards("adm");
+  }
+
+  /* ---- Match game: "Which one fits?" ---- */
+  const match = { edu: { cur: null, pick: null, streak: 0, score: 0 }, adm: { cur: null, pick: null, streak: 0, score: 0 } };
+  function newMatch(kind) {
+    const m = match[kind];
+    if (kind === "edu") {
+      const pool = [];
+      APPROACHES.forEach((a, i) => a.how.forEach((h, k) => pool.push({ i, text: h, key: `match-edu-${i}-${k}` })));
+      let next; do { next = pool[(Math.random() * pool.length) | 0]; } while (m.cur && next.text === m.cur.text && pool.length > 1);
+      m.cur = next;
+    } else {
+      let i; do { i = (Math.random() * POLICIES.length) | 0; } while (m.cur && i === m.cur.i && POLICIES.length > 1);
+      // hide the policy's own wording a little: use its description only
+      m.cur = { i, text: POLICIES[i].desc, key: `match-adm-${i}` };
+    }
+    m.pick = null;
+  }
+  function renderMatch(kind) {
+    const el = $(kind === "edu" ? "#eduMatch" : "#admMatch");
+    if (!el) return;
+    const m = match[kind];
+    if (!m.cur) newMatch(kind);
+    const list = kind === "edu" ? APPROACHES : POLICIES;
+    const done = m.pick !== null, right = m.pick === m.cur.i;
+    el.innerHTML = `
+      <div class="panel-top">
+        <span class="mono-k">Mini game · ${kind === "edu" ? "Which approach is this?" : "Which policy is this?"}</span>
+        <span class="rush-stats"><span class="chip">Score <b>${m.score}</b></span><span class="chip ${m.streak >= 3 ? "hot" : ""}">Streak ×${m.streak}</span></span>
+      </div>
+      <blockquote class="match-q">“${esc(m.cur.text)}”</blockquote>
+      <div class="match-opts">
+        ${list.map((x, i) => {
+          let cls = "";
+          if (done) cls = i === m.cur.i ? "correct" : i === m.pick ? "wrong" : "dim";
+          return `<button type="button" class="match-opt ${cls}" data-i="${i}" ${done ? "disabled" : ""}><span class="card-num sm" style="background:${COLORS[i % COLORS.length]}">${String(i + 1).padStart(2, "0")}</span><span>${esc(x.title)}</span></button>`;
+        }).join("")}
+      </div>
+      <div aria-live="polite">${done ? `<div class="feedback ${right ? "ok" : "bad"}"><b>${right ? "✓ Correct!" : "✗ That one belongs to #" + (m.cur.i + 1) + "."}</b>${esc(list[m.cur.i].title)}</div>` : ""}</div>
+      ${done ? `<div class="actions"><button type="button" class="key key-yellow" data-next>Next one →</button><button type="button" class="key key-ghost" data-open>Open #${m.cur.i + 1}</button></div>` : ""}`;
+    $$(".match-opt", el).forEach((b) => b.addEventListener("click", () => {
+      m.pick = Number(b.dataset.i);
+      if (m.pick === m.cur.i) {
+        m.score++; m.streak++; good(b, m.streak >= 3 ? 30 : 16);
+        award(m.cur.key, 5);
+      } else { m.streak = 0; bad(el); }
+      renderMatch(kind);
+    }));
+    const nx = $("[data-next]", el);
+    if (nx) nx.addEventListener("click", () => { newMatch(kind); renderMatch(kind); });
+    const op = $("[data-open]", el);
+    if (op) op.addEventListener("click", () => openDetail(kind, m.cur.i, 0, op));
+  }
 
   /* ==========================================================
      HOME — Debit or Credit Rush (timed)
@@ -914,6 +1221,8 @@
     { id: "flawless", icon: "✓", name: "Flawless", desc: "Score 10/10 in any side quest.", test: (s) => SIDE_QUESTS.some((g) => s.best[g.id] === g.items.length) },
     { id: "mentor", icon: "✎", name: "Mentor's Map", desc: "Explore all seven teaching approaches.", test: (s) => s.seenEdu.length >= APPROACHES.length },
     { id: "compass", icon: "⌖", name: "Campus Compass", desc: "Explore all five university policies.", test: (s) => s.seenAdm.length >= POLICIES.length },
+    { id: "planner", icon: "☑", name: "Lesson Planner", desc: "Add every step of one approach to your teaching plan.", test: (s) => APPROACHES.some((a, i) => ((s.eduPlan || {})[i] || []).length === a.how.length) },
+    { id: "roadmap", icon: "⛳", name: "Policy Champion", desc: "Mark all five policies as implemented on the roadmap.", test: (s) => POLICIES.every((_, i) => (s.admStatus || {})[i] === "done") },
     { id: "cpa", icon: "♛", name: "CPA-Ready", desc: "Reach the top rank.", test: (s) => s.xp >= RANKS[RANKS.length - 1].min }
   ];
 
@@ -1009,7 +1318,7 @@
      ========================================================== */
   function initKeys() {
     document.addEventListener("keydown", (e) => {
-      if (e.ctrlKey || e.metaKey || e.altKey || $("#loader:not(.done)") || $("#badgeDialog").open) return;
+      if (e.ctrlKey || e.metaKey || e.altKey || $("#loader:not(.done)") || $("#badgeDialog").open || $("#detailDialog").open) return;
       const tag = (e.target.tagName || "").toLowerCase();
       if (tag === "input" || tag === "textarea" || tag === "select") return;
       const view = ($(".view:not([hidden])") || {}).dataset?.view;
@@ -1265,14 +1574,10 @@
     renderQuest();
     renderSQGrid();
     renderHub();
-    renderCards({
-      list: APPROACHES, mount: "#eduCards", seenKey: "seenEdu", countEl: "#eduCount", barEl: "#eduBar", label: "approaches",
-      bodyFn: (a) => `<p>${esc(a.summary)}</p><h4 style="margin-top:14px">How to apply?</h4><ul>${a.how.map((h) => `<li>${esc(h)}</li>`).join("")}</ul>`
-    });
-    renderCards({
-      list: POLICIES, mount: "#admCards", seenKey: "seenAdm", countEl: "#admCount", barEl: "#admBar", label: "policies",
-      bodyFn: (p) => `<p>${esc(p.desc)}</p>`
-    });
+renderCards("edu");
+    renderCards("adm");
+    renderMatch("edu");
+    renderMatch("adm");
 
     route();
   }
@@ -1282,6 +1587,7 @@
     state = fresh(); save();
     qs.wrong = []; qs.solved = false; sq = null; $("#sqPlayer").hidden = true;
     bal.round = 0; bal.pick = null; bal.tries = 0; bal.angle = 0;
+    match.edu = { cur: null, pick: null, streak: 0, score: 0 }; match.adm = { cur: null, pick: null, streak: 0, score: 0 };
     sk.i = 0; sk.picks = SKILL_CHECKS.map(() => null); sk.summary = false;
     clearInterval(rush.timer); rush.phase = "idle";
     init();

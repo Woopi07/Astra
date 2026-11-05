@@ -187,11 +187,17 @@
         <div class="fx"><span class="fx-icon">ƒx</span><code>=APPROACHES("teach", 7)</code></div>
         <p class="eyebrow">For educators</p>
         <h1 id="eduTitle">Seven <span class="hl">suggested approaches</span></h1>
-        <p class="lead">Ways to teach with software, simulations and rubrics. Open each card to see how to apply it in class.</p>
+        <p class="lead">Ways to teach with software, simulations and rubrics. Open a card, tap the steps you want to try, and build your own teaching plan.</p>
         <div class="progress-line"><span class="chip" id="eduCount">0 / 7 explored</span><div class="bar"><i id="eduBar"></i></div></div>
       </div>
       <div class="wrap block">
         <div class="cards" id="eduCards"></div>
+      </div>
+      <div class="wrap block">
+        <div class="duo">
+          <div class="panel plan" id="eduPlan"></div>
+          <div class="panel" id="eduMatch"></div>
+        </div>
       </div>
     </section>
 
@@ -201,11 +207,17 @@
         <div class="fx"><span class="fx-icon">ƒx</span><code>=POLICIES("PLV", 5)</code></div>
         <p class="eyebrow">For PLV admins</p>
         <h1 id="admTitle">Five <span class="hl">suggested university policies</span></h1>
-        <p class="lead">Policies for technology-integrated instruction across the accounting program. Open each card to read it.</p>
+        <p class="lead">Policies for technology-integrated instruction across the accounting program. Open a card to set its status and priority, and track PLV’s readiness on the roadmap.</p>
         <div class="progress-line"><span class="chip" id="admCount">0 / 5 explored</span><div class="bar"><i id="admBar"></i></div></div>
       </div>
       <div class="wrap block">
         <div class="cards" id="admCards"></div>
+      </div>
+      <div class="wrap block">
+        <div class="panel" id="admRoad"></div>
+      </div>
+      <div class="wrap block">
+        <div class="panel" id="admMatch"></div>
       </div>
     </section>
 
@@ -223,6 +235,11 @@
   </footer>
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <!-- Approach / policy detail -->
+  <dialog class="detail" id="detailDialog" aria-labelledby="detailTitle">
+    <div id="detailCard"></div>
+  </dialog>
 
   <!-- Badges -->
   <dialog class="badges" id="badgeDialog" aria-labelledby="badgeTitle">
