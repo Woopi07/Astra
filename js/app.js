@@ -1646,6 +1646,7 @@
     const trackId = () => TRACK_FOR[context] || "lofi";
     const listeners = new Set();
     const notify = () => listeners.forEach((fn) => fn());
+    const holds = new Set();
     let held = false;
     function apply() {
       if (!S.music || held) { if (eng) eng.stop(); setTimeout(notify, 950); notify(); return Promise.resolve(); }
@@ -1673,7 +1674,12 @@
         notify();
       },
       tempo(m) { if (eng) eng.setTempo(m); },
-      hold(on) { if (held === on) return; held = on; apply(); },
+      hold(on, why = "video") {
+        if (on) holds.add(why); else holds.delete(why);
+        const next = holds.size > 0;
+        if (next === held) return;
+        held = next; apply();
+      },
       get now() { return TRACKS[trackId()]; },
       get running() { return !!eng && eng.running && S.music; },
       onChange(fn) { listeners.add(fn); }
@@ -2025,6 +2031,21 @@
   $("#settingsBtnMenu").addEventListener("click", openSettings);
   $("#settingsDialog").addEventListener("click", (e) => { if (e.target === e.currentTarget) e.currentTarget.close(); });
   if (!S.bg) $("#bgCanvas").style.display = "none";
+
+  /* ---------------- About-the-study video ---------------- */
+  (function initStudyVideo() {
+    const frame = $("#studyVideo");
+    if (!frame) return;
+    frame.addEventListener("load", () => frame.closest(".study").classList.add("ready"), { once: true });
+    // clicking into the video moves focus into the iframe, which blurs the page
+    window.addEventListener("blur", () => {
+      setTimeout(() => { if (document.activeElement === frame) musicCtl.hold(true, "study"); }, 0);
+    });
+    // back on the page (or on another section): let the music return
+    const release = () => musicCtl.hold(false, "study");
+    window.addEventListener("hashchange", release);
+    document.addEventListener("pointerdown", (e) => { if (!e.target.closest || !e.target.closest(".study")) release(); }, { passive: true });
+  })();
 
   /* ---------------- Init ---------------- */
   function init() {
