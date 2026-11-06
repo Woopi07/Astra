@@ -1165,3 +1165,24 @@ html.no-motion [data-tilt]::after { display: none; }
   .lcd-rank { display: none; }
   .tabs .pill { padding: 6px 11px; font-size: .86rem; }
 }
+
+/* ==========================================================
+   v12 — live results under Priority / Readiness
+   ========================================================== */
+.poll { margin-top: 12px; padding: 12px 14px; border-radius: 12px; background: var(--bg-2); border: 1px dashed var(--line); }
+.poll-head { display: flex; justify-content: space-between; align-items: center; font-family: var(--font-mono); font-size: .72rem; color: var(--muted); }
+.poll-live { display: inline-flex; align-items: center; gap: 6px; text-transform: uppercase; letter-spacing: .1em; color: var(--coral); font-weight: 700; }
+.poll-live i { width: 8px; height: 8px; border-radius: 50%; background: var(--coral); animation: livePulse 1.4s ease-in-out infinite; }
+@keyframes livePulse { 50% { opacity: .3; transform: scale(.7); } }
+.poll-load { font-size: .8rem; color: var(--muted); display: inline-flex; gap: 8px; align-items: center; }
+.poll-top { margin: 6px 0 8px; font-size: .95rem; }
+.poll-top b { color: var(--yellow); }
+.poll-bars { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.poll-bars li { display: grid; grid-template-columns: minmax(0, 8.5rem) 1fr 3rem; align-items: center; gap: 10px; font-size: .84rem; color: var(--muted); }
+.poll-bars .pl small { color: var(--mint); font-size: .72rem; }
+.poll-bars .pb { height: 8px; border-radius: 4px; background: var(--panel-2); overflow: hidden; }
+.poll-bars .pb i { display: block; height: 100%; background: var(--blue); border-radius: 4px; transition: width .6s cubic-bezier(.3,1,.4,1); }
+.poll-bars li.top { color: var(--text); }
+.poll-bars li.top .pb i { background: var(--yellow); }
+.poll-bars .pp { font-family: var(--font-mono); text-align: right; font-size: .78rem; }
+@media (max-width: 480px) { .poll-bars li { grid-template-columns: minmax(0, 6.5rem) 1fr 2.6rem; } }

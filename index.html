@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>ASTRA — Digital Accounting Education Hub</title>
-  <meta name="description" content="A gamified, centralized online hub with supplementary resources and practical learning opportunities for digital accounting education." />
+  <meta name="description" content="A centralized online hub with supplementary resources and practical learning opportunities. Build beyond your technical skill, emerge with technology in the accounting profession!" />
   <meta name="theme-color" content="#0a0f2e" />
   <link rel="icon" href="assets/favicon.svg" type="image/svg+xml" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -55,8 +55,8 @@
 
       <nav class="tabs" id="siteNav" aria-label="Sections">
         <a href="#home" data-tab="home" class="pill">Home</a>
-        <a href="#students" data-tab="students" class="pill">Students</a>
-        <a href="#hub" data-tab="hub" class="pill">Resource Hub</a>
+        <a href="#students" data-tab="students" class="pill">Habit Hub</a>
+        <a href="#hub" data-tab="hub" class="pill">For Students</a>
         <a href="#educators" data-tab="educators" class="pill">Educators</a>
         <a href="#admins" data-tab="admins" class="pill">PLV Admins</a>
         <button type="button" class="pill pill-settings" id="settingsBtnMenu" aria-haspopup="dialog">
@@ -88,7 +88,7 @@
         <div class="hero-copy">
           <div class="fx"><span class="fx-icon">ƒx</span><code>=WELCOME("Future CPA")</code></div>
           <h1 id="homeTitle">Digital Accounting <span class="hl">Education Hub</span></h1>
-          <p class="lead">A centralized online hub with supplementary resources and practical learning opportunities. Build your technical competencies and get ready for technology in the accounting profession.</p>
+          <p class="lead">A centralized online hub with supplementary resources and practical learning opportunities. Build beyond your technical skill, emerge with technology in the accounting profession!</p>
           <div class="hero-cta">
             <a class="key key-yellow" href="#students">Start the quest →</a>
             <a class="key key-ghost" href="#hub">Browse resources</a>
@@ -103,8 +103,8 @@
             <div class="calc-main"><span id="calcMain">0 XP</span><span class="calc-cursor" aria-hidden="true">▌</span></div>
           </div>
           <div class="calc-keys">
-            <a href="#students" class="ck ck-yellow"><b>STU</b><small>Students</small></a>
-            <a href="#hub" class="ck ck-blue"><b>HUB</b><small>Resources</small></a>
+            <a href="#students" class="ck ck-yellow"><b>HUB</b><small>Habit Hub</small></a>
+            <a href="#hub" class="ck ck-blue"><b>STU</b><small>For Students</small></a>
             <a href="#educators" class="ck ck-coral"><b>EDU</b><small>Educators</small></a>
             <a href="#admins" class="ck ck-mint"><b>ADM</b><small>PLV Admins</small></a>
             <a href="#sidequests" class="ck ck-dark ck-wide"><b>=</b><small>Play side quests</small></a>
@@ -140,9 +140,9 @@
     <section class="view" id="view-students" data-view="students" aria-labelledby="stuTitle" hidden>
       <div class="wrap page-head">
         <div class="fx"><span class="fx-icon">ƒx</span><code>=HABITS("pay off", 5)</code></div>
-        <p class="eyebrow">For accounting students</p>
+        <p class="eyebrow">Habit Hub</p>
         <h1 id="stuTitle">Five habits <span class="hl">that pay off</span></h1>
-        <p class="lead">Clear the case study to collect all five habits. Each challenge you finish unlocks one habit for your inventory.</p>
+        <p class="lead">Habit-building games; a case-study quest and competency mini-games. Clear the case study to collect all five habits. Each challenge you finish unlocks one habit for your inventory.</p>
       </div>
 
       <div class="wrap block">
@@ -172,7 +172,7 @@
     <!-- ============ RESOURCE HUB ============ -->
     <section class="view" id="view-hub" data-view="hub" aria-labelledby="hubTitle" hidden>
       <div class="wrap page-head">
-        <p class="eyebrow">Digital accounting learning resource hub</p>
+        <p class="eyebrow">For accounting students</p>
         <h1 id="hubTitle">Tutorials <span class="hl">to templates</span></h1>
         <p class="lead">Supplementary resources and practical learning opportunities to help you understand digital accounting concepts, build technical competencies, and prepare for the growing use of technology in the profession.</p>
       </div>
@@ -210,11 +210,11 @@
     <!-- ============ PLV ADMINS ============ -->
     <section class="view" id="view-admins" data-view="admins" aria-labelledby="admTitle" hidden>
       <div class="wrap page-head">
-        <div class="fx"><span class="fx-icon">ƒx</span><code>=POLICIES("PLV", 5)</code></div>
+        <div class="fx"><span class="fx-icon">ƒx</span><code>=POLICIES("PLV", 6)</code></div>
         <p class="eyebrow">For PLV admins</p>
-        <h1 id="admTitle">Five <span class="hl">suggested university policies</span></h1>
+        <h1 id="admTitle">Six <span class="hl">suggested university policies</span></h1>
         <p class="lead">Policies for technology-integrated instruction across the accounting program. Open a card to set its status and priority, and track PLV’s readiness on the roadmap.</p>
-        <div class="progress-line"><span class="chip" id="admCount">0 / 5 explored</span><div class="bar"><i id="admBar"></i></div></div>
+        <div class="progress-line"><span class="chip" id="admCount">0 / 6 explored</span><div class="bar"><i id="admBar"></i></div></div>
       </div>
       <div class="wrap block">
         <div class="cards" id="admCards"></div>

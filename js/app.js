@@ -194,13 +194,13 @@
      HOME — Overview flip cards (with live progress)
      ========================================================== */
   const OVERVIEW = [
-    { id: "students", color: "yellow", k: "For accounting students", title: "Five habits that pay off", desc: "Habits for building skills that carry across systems, plus a case-study quest and side quests.", count: "05", cta: "Start the quest", href: "#students",
+    { id: "students", color: "yellow", k: "Habit Hub", title: "Five habits that pay off", desc: "Habit-building games; a case-study quest and competency mini-games.", count: "05", cta: "Start the quest", href: "#students",
       list: () => HABITS.map((h) => ({ t: h.title, done: state.habits.includes(h.id) })) },
-    { id: "hub", color: "blue", k: "Resource hub", title: "Tutorials to templates", desc: "Software guides, exercises, videos, case studies and templates.", count: "05", cta: "Open the hub", href: "#hub",
+    { id: "hub", color: "blue", k: "For accounting students", title: "Tutorials to templates", desc: "Software guides, exercises, videos, case studies and templates.", count: "05", cta: "Open the hub", href: "#hub",
       list: () => HUB_TABS.map((t) => ({ t: t.title, done: state.hubSeen.includes(t.id) })) },
     { id: "educators", color: "coral", k: "For educators", title: "Seven approaches", desc: "Ways to teach with software, simulations and rubrics.", count: "07", cta: "See approaches", href: "#educators",
       list: () => APPROACHES.map((x, i) => ({ t: x.title, done: state.seenEdu.includes(i) })) },
-    { id: "admins", color: "mint", k: "For PLV admins", title: "Five policies", desc: "Suggested university policies for technology-integrated instruction.", count: "05", cta: "Read policies", href: "#admins",
+    { id: "admins", color: "mint", k: "For PLV admins", title: "Six policies", desc: "Suggested university policies for technology-integrated instruction.", count: "06", cta: "Read policies", href: "#admins",
       list: () => POLICIES.map((x, i) => ({ t: x.title, done: state.seenAdm.includes(i) })) }
   ];
 
@@ -849,7 +849,7 @@
             const ext = l.kind !== "internal";
             const isVid = l.kind === "video" && ytEmbed(l.url);
             const seen = isVid && (state.watched || []).includes(l.url);
-            const kind = isVid ? "▶ Watch here" : l.kind === "site" ? "↗ Website" : "◆ Play on ASTRA";
+            const kind = isVid ? "▶ Watch here" : l.kind === "channel" ? "▶ Visit channel ↗" : l.kind === "site" ? "↗ Website" : "◆ Play on ASTRA";
             return `<li><a class="res ${isVid ? "res-video" : ""}" href="${esc(l.url)}" ${isVid ? `data-vid="${i}"` : ""} ${ext ? 'target="_blank" rel="noopener noreferrer"' : ""}>
               <span class="tag">${esc(l.tag)}</span><span class="lbl">${esc(l.label)}</span><span class="kind">${kind}${seen ? ' <span class="watched">✓ Watched</span>' : ""}</span></a></li>`;
           }).join("")}
@@ -960,14 +960,16 @@
           }).join("")}
         </ul>
         <h4>Where are you with this approach?</h4>
-        <div class="seg" role="group" aria-label="Readiness">${READY.map(([v, l]) => `<button type="button" class="seg-btn ${state.eduReady[i] === v ? "on" : ""}" data-ready="${v}" aria-pressed="${state.eduReady[i] === v}">${esc(l)}</button>`).join("")}</div>`;
+        <div class="seg" role="group" aria-label="Readiness">${READY.map(([v, l]) => `<button type="button" class="seg-btn ${state.eduReady[i] === v ? "on" : ""}" data-ready="${v}" aria-pressed="${state.eduReady[i] === v}">${esc(l)}</button>`).join("")}</div>
+        <div class="poll" data-poll="edu-ready-${i}" aria-live="polite" hidden></div>`;
     } else {
       body = `
         <p class="detail-sum">${esc(item.desc)}</p>
         <h4>Implementation status</h4>
         <div class="seg status-seg" role="group" aria-label="Implementation status">${STATUS.map(([v, l], k) => `<button type="button" class="seg-btn st-${v} ${(state.admStatus[i] || "none") === v ? "on" : ""}" data-status="${v}" aria-pressed="${(state.admStatus[i] || "none") === v}"><span class="st-dot"></span>${esc(l)}</button>`).join("")}</div>
         <h4>Priority for PLV</h4>
-        <div class="seg" role="group" aria-label="Priority">${PRIORITY.map(([v, l]) => `<button type="button" class="seg-btn ${state.admPriority[i] === v ? "on" : ""}" data-pri="${v}" aria-pressed="${state.admPriority[i] === v}"><span class="pri-bars p${v}"><i></i><i></i><i></i></span>${esc(l)}</button>`).join("")}</div>`;
+        <div class="seg" role="group" aria-label="Priority">${PRIORITY.map(([v, l]) => `<button type="button" class="seg-btn ${state.admPriority[i] === v ? "on" : ""}" data-pri="${v}" aria-pressed="${state.admPriority[i] === v}"><span class="pri-bars p${v}"><i></i><i></i><i></i></span>${esc(l)}</button>`).join("")}</div>
+        <div class="poll" data-poll="adm-pri-${i}" aria-live="polite" hidden></div>`;
     }
     $("#detailCard").innerHTML = `
       <div class="detail-inner ${dir > 0 ? "sw-r" : dir < 0 ? "sw-l" : "sw-in"}" style="--accent:${color}">
@@ -988,6 +990,7 @@
       </div>`;
 
     const card = $("#detailCard");
+    hydratePolls(card);
     $("#detailClose", card).addEventListener("click", closeDetail);
     $("#detailPrev", card).addEventListener("click", () => stepDetail(-1));
     $("#detailNext", card).addEventListener("click", () => stepDetail(1));
@@ -1010,6 +1013,7 @@
       state.eduReady[i] = state.eduReady[i] === b.dataset.ready ? undefined : b.dataset.ready;
       if (!state.eduReady[i]) delete state.eduReady[i];
       fx.sound("click"); save(); renderDetail(0); renderCards("edu");
+      castVote("edu-ready-" + i);
     }));
     $$("[data-status]", card).forEach((b) => b.addEventListener("click", () => {
       state.admStatus[i] = b.dataset.status;
@@ -1021,7 +1025,85 @@
       state.admPriority[i] = state.admPriority[i] === v ? undefined : v;
       if (!state.admPriority[i]) delete state.admPriority[i];
       fx.sound("click"); save(); renderDetail(0); renderCards("adm");
+      castVote("adm-pri-" + i);
     }));
+  }
+
+  /* ---- live results ("Most users said: …") shared across all visitors ---- */
+  const POLL_OPTS = { "adm-pri": [["1", "Low"], ["2", "Medium"], ["3", "High"]], "edu-ready": READY.map(([v, l]) => [v, l]) };
+  const polls = { counts: {}, ok: null, pending: {} };
+  function voterId() {
+    let id = null;
+    try { id = localStorage.getItem("astra-voter"); } catch (e) { /* ignore */ }
+    if (!id) {
+      id = (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 12);
+      try { localStorage.setItem("astra-voter", id); } catch (e) { /* ignore */ }
+    }
+    return id;
+  }
+  async function pollApi(method, body, keys) {
+    if (location.protocol === "file:") throw new Error("no server");
+    const url = "/api/votes" + (keys ? "?keys=" + encodeURIComponent(keys.join(",")) : "");
+    const r = await fetch(url, method === "POST"
+      ? { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }
+      : { cache: "no-store" });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || !j.ok) throw new Error("unavailable");
+    return j;
+  }
+  function myVote(key) {
+    ensureMaps();
+    const i = Number(key.split("-").pop());
+    if (key.startsWith("adm-pri")) return state.admPriority[i] ? String(state.admPriority[i]) : null;
+    return state.eduReady[i] || null;
+  }
+  function castVote(key) {
+    if (polls.ok === false) return;
+    const value = myVote(key);
+    pollApi("POST", { key, voter: voterId(), value })
+      .then((j) => { polls.ok = true; Object.assign(polls.counts, j.counts); state.votesSent = state.votesSent || {}; state.votesSent[key] = value; persist(); })
+      .catch(() => { polls.ok = false; })
+      .finally(refreshPolls);
+  }
+  function refreshPolls() { $$("[data-poll]").forEach(renderPoll); }
+  function renderPoll(el) {
+    const key = el.dataset.poll;
+    if (polls.ok === false) { el.hidden = true; return; }
+    const opts = POLL_OPTS[key.replace(/-\d+$/, "")];
+    const c = polls.counts[key];
+    el.hidden = false;
+    if (!c) { el.innerHTML = '<span class="poll-load"><span class="poll-live"><i></i>Live results</span> loading…</span>'; return; }
+    const total = opts.reduce((t, [v]) => t + (c[v] || 0), 0);
+    const max = Math.max(...opts.map(([v]) => c[v] || 0));
+    const tops = total ? opts.filter(([v]) => (c[v] || 0) === max) : [];
+    const who = key.startsWith("edu") ? "educators" : "users";
+    const mine = myVote(key);
+    const headline = !total ? "No votes yet. Yours will be the first!"
+      : tops.length === 1 ? `Most ${who} said: <b>“${esc(tops[0][1])}”</b>`
+      : `It's a tie: <b>${tops.map((t) => "“" + esc(t[1]) + "”").join(" & ")}</b>`;
+    el.innerHTML = `
+      <div class="poll-head"><span class="poll-live"><i></i>Live results</span><span>${total} vote${total === 1 ? "" : "s"}</span></div>
+      <p class="poll-top">${headline}</p>
+      <ul class="poll-bars">${opts.map(([v, l]) => {
+        const n = c[v] || 0, pc = total ? Math.round((n / total) * 100) : 0;
+        return `<li class="${tops.some((t) => t[0] === v) ? "top" : ""} ${mine === v ? "mine" : ""}"><span class="pl">${esc(l)}${mine === v ? " <small>(you)</small>" : ""}</span><span class="pb"><i style="width:${pc}%"></i></span><span class="pp">${pc}%</span></li>`;
+      }).join("")}</ul>`;
+  }
+  function hydratePolls(root) {
+    const els = $$("[data-poll]", root);
+    if (!els.length) return;
+    els.forEach(renderPoll);
+    if (polls.ok === false) return;
+    state.votesSent = state.votesSent || {};
+    // send any choice made before live results existed (or while offline)
+    els.forEach((el) => { const k = el.dataset.poll; if ((state.votesSent[k] ?? null) !== myVote(k)) castVote(k); });
+    const keys = els.map((e) => e.dataset.poll).filter((k) => !polls.pending[k]);
+    if (!keys.length) return;
+    keys.forEach((k) => { polls.pending[k] = true; });
+    pollApi("GET", null, keys)
+      .then((j) => { polls.ok = true; Object.assign(polls.counts, j.counts); })
+      .catch(() => { polls.ok = false; })
+      .finally(() => { keys.forEach((k) => delete polls.pending[k]); refreshPolls(); });
   }
 
   function stepDetail(d) {
@@ -1337,9 +1419,9 @@
     { id: "triple", icon: "▲", name: "Triple Threat", desc: "Finish all three side quests.", test: (s) => SIDE_QUESTS.every((g) => s.best[g.id] !== undefined) },
     { id: "flawless", icon: "✓", name: "Flawless", desc: "Score 10/10 in any side quest.", test: (s) => SIDE_QUESTS.some((g) => s.best[g.id] === g.items.length) },
     { id: "mentor", icon: "✎", name: "Mentor's Map", desc: "Explore all seven teaching approaches.", test: (s) => s.seenEdu.length >= APPROACHES.length },
-    { id: "compass", icon: "⌖", name: "Campus Compass", desc: "Explore all five university policies.", test: (s) => s.seenAdm.length >= POLICIES.length },
+    { id: "compass", icon: "⌖", name: "Campus Compass", desc: "Explore all six university policies.", test: (s) => s.seenAdm.length >= POLICIES.length },
     { id: "planner", icon: "☑", name: "Lesson Planner", desc: "Add every step of one approach to your teaching plan.", test: (s) => APPROACHES.some((a, i) => ((s.eduPlan || {})[i] || []).length === a.how.length) },
-    { id: "roadmap", icon: "⛳", name: "Policy Champion", desc: "Mark all five policies as implemented on the roadmap.", test: (s) => POLICIES.every((_, i) => (s.admStatus || {})[i] === "done") },
+    { id: "roadmap", icon: "⛳", name: "Policy Champion", desc: "Mark all six policies as implemented on the roadmap.", test: (s) => POLICIES.every((_, i) => (s.admStatus || {})[i] === "done") },
     { id: "cpa", icon: "♛", name: "CPA-Ready", desc: "Reach the top rank.", test: (s) => s.xp >= RANKS[RANKS.length - 1].min }
   ];
 

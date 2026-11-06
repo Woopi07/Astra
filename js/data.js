@@ -602,12 +602,16 @@ const HUB_TABS = [
   {
     id: "videos",
     label: "Videos",
-    formula: '=VIDEOS("Journal", "Ledger", "Statements")',
+    formula: '=CHANNELS("YouTube", 6)',
     title: "Video Demonstrations",
-    desc: "Recorded lessons showing how to perform common accounting tasks, such as recording transactions, preparing journal entries, posting to ledgers, and generating financial statements using digital tools.",
+    desc: "Recorded lessons showing how to perform common accounting tasks, such as recording transactions, preparing journal entries, posting to ledgers, and generating financial statements using digital tools. Suggested channels to watch:",
     links: [
-      { tag: "FS automation", label: "How to Automate Accounting Ledger, Trial Balance, Income Statement, Balance Sheet", url: "https://www.youtube.com/watch?v=pgBsyTKAwLw", kind: "video" },
-      { tag: "Full accounting cycle", label: "Accounting Cycle (Sir Chua)", url: "https://www.youtube.com/playlist?list=PLvUbkBvnR-nTyQDpguwgbi669IoDQpwRW", kind: "video" }
+      { tag: "YouTube channel", label: "Sir Win Accounting Lectures", url: "https://www.youtube.com/@SirWinAccountingLectures", kind: "channel" },
+      { tag: "YouTube channel", label: "Sir Chua Accounting Lessons PH", url: "https://www.youtube.com/@SirChuaAccountingLessonsPH", kind: "channel" },
+      { tag: "YouTube channel", label: "Accounting Lessons with BCV", url: "https://www.youtube.com/@AccountingLessonswithBCV", kind: "channel" },
+      { tag: "YouTube channel", label: "Mr. Accounting", url: "https://www.youtube.com/@MrAccounting", kind: "channel" },
+      { tag: "YouTube channel", label: "Accounting Lecture Series", url: "https://www.youtube.com/@accountinglectureseries", kind: "channel" },
+      { tag: "YouTube channel", label: "Atty. JJ Law Made Easy", url: "https://www.youtube.com/@AttyJJLawMadeEasy", kind: "channel" }
     ]
   },
   {
@@ -701,7 +705,7 @@ const APPROACHES = [
   }
 ];
 
-/* ---------- PLV Admins: Five policies ---------- */
+/* ---------- PLV Admins: Six policies ---------- */
 const POLICIES = [
   {
     title: "Integrate Practical Technology Applications into Accounting Courses",
@@ -722,6 +726,10 @@ const POLICIES = [
   {
     title: "Establish Continuous Feedback Mechanisms",
     desc: "Conduct regular consultations and gather feedback from alumni and industry partners to identify gaps in students' technological competencies and ensure that accounting education remains responsive to current workplace demands."
+  },
+  {
+    title: "Consider Increasing Government Funding for Practical Technology Integration",
+    desc: "Local government agency may consider allocating additional funding to the institution to support the acquisition of accounting software, upgrading of computer laboratory facilities, maintenance of equipment, and provision of other learning resources necessary to strengthen practical and technology-integrated accounting instruction."
   }
 ];
 
