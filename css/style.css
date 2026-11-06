@@ -1200,5 +1200,5 @@ html.no-motion [data-tilt]::after { display: none; }
 .study-loading .eq { width: 26px; height: 26px; }
 .study-loading .eq i { background: var(--yellow); }
 .study.ready .study-loading { display: none; }
-.study-bar { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 16px; }
+.study-bar { display: flex; justify-content: flex-end; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 16px; }
 @media (max-width: 640px) { .study-frame { box-shadow: 5px 5px 0 var(--blue-deep); border-radius: 14px; } }
