@@ -1202,3 +1202,19 @@ html.no-motion [data-tilt]::after { display: none; }
 .study.ready .study-loading { display: none; }
 .study-bar { display: flex; justify-content: flex-end; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 16px; }
 @media (max-width: 640px) { .study-frame { box-shadow: 5px 5px 0 var(--blue-deep); border-radius: 14px; } }
+
+/* ==========================================================
+   iOS Safari fix: flip cards showed both faces (mirrored).
+   Safari can ignore backface-visibility, so the hidden face is
+   also switched off with visibility halfway through the flip.
+   ========================================================== */
+.flip-front { transform: rotateY(0deg) translateZ(1px); -webkit-transform: rotateY(0deg) translateZ(1px); }
+.flip-back { transform: rotateY(180deg) translateZ(1px); -webkit-transform: rotateY(180deg) translateZ(1px); }
+.flip-front, .flip-back { -webkit-backface-visibility: hidden; backface-visibility: hidden; }
+.flip-inner .flip-front { visibility: visible; transition: visibility 0s linear .3s; }
+.flip-inner .flip-back { visibility: hidden; transition: visibility 0s linear .3s; }
+.flip-inner.flipped .flip-front { visibility: hidden; }
+.flip-inner.flipped .flip-back { visibility: visible; }
+@media (prefers-reduced-motion: reduce) {
+  .flip-inner .flip-front, .flip-inner .flip-back { transition: none; }
+}
